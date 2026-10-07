@@ -1,1 +1,386 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Dashboard | HomeIoT</title><link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20"></head><body><button class="mobile-menu" onclick="toggleSidebar()" aria-label="Open menu">☰</button><aside class="sidebar" id="sidebar"><div class="brand"><div class="brand-icon">⌂</div><div><h2>HomeIoT</h2><span>Remote Control</span></div></div><nav><a href="{{ url_for('home') }}">🏠 &nbsp; Home</a><a href="{{ url_for('dashboard') }}" class="active">▦ &nbsp; Dashboard</a><a href="#devices">◉ &nbsp; Devices</a><a href="#monitoring">◌ &nbsp; Monitoring</a><a href="{{ url_for('history') }}">◷ &nbsp; History</a><a href="{{ url_for('settings') }}">⚙ &nbsp; Settings</a>{% if current_user and current_user['role']=='ADMIN' %}<a href="{{ url_for('admin_users') }}">♙ &nbsp; Admin</a>{% endif %}</nav><div class="sidebar-footer"><div class="sidebar-user"><div class="connection-dot"></div><div><strong>{{ current_user['username'] }}</strong><span>{{ current_user['role'] }} · Approved</span></div></div><form class="logout-form" method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit">⇥ &nbsp; Logout</button></form></div></aside><main class="main"><header class="topbar"><div><p class="eyebrow">REMOTE CONTROL</p><h1>Home Dashboard</h1><p class="subtitle">Control and monitor your connected appliances remotely.</p></div><div id="mqttBadge" class="badge offline">● MQTT Offline</div></header><section class="hero"><div class="hero-content"><p class="eyebrow">INTERNET OF THINGS</p><h2>Control your home <span>from anywhere.</span></h2><p>Flask → HiveMQ Cloud → ESP32</p></div><div class="hero-flow"><div class="flow-item"><div class="flow-icon">☁</div><span>Flask</span></div><div class="flow-line"></div><div class="flow-item"><div class="flow-icon">↔</div><span>MQTT</span></div><div class="flow-line"></div><div class="flow-item"><div class="flow-icon">▣</div><span>ESP32</span></div></div></section><h2 class="section-title" id="devices">Appliances</h2><section class="devices">{% for device,label,icon,desc in [('light','Light','💡','Room lighting'),('fan','Fan / AC','🌀','Cooling system'),('geyser','Geyser','♨️','Water heating')]}<article class="card device-card"><div class="device-top"><div class="icon">{{icon}}</div><div class="device-info"><h3>{{label}}</h3><p>{{desc}}</p><span id="{{device}}State" class="state off">OFF</span></div></div><div class="buttons"><button class="primary" onclick="controlDevice('{{device}}','ON')">ON</button><button class="secondary" onclick="controlDevice('{{device}}','OFF')">OFF</button></div></article>{% endfor %}</section><h2 class="section-title" id="monitoring">System Monitoring</h2><section class="monitoring"><article class="card monitor-card"><div class="monitor-icon">↔</div><div><span>MQTT</span><strong id="mqttText">Offline</strong></div></article><article class="card monitor-card"><div class="monitor-icon">°C</div><div><span>Temperature</span><strong id="temperature">-- °C</strong></div></article><article class="card monitor-card"><div class="monitor-icon">%</div><div><span>Humidity</span><strong id="humidity">-- %</strong></div></article><article class="card monitor-card"><div class="monitor-icon">◉</div><div><span>Gas</span><strong id="gas">NORMAL</strong></div></article></section><div id="message" class="message"></div><footer>HomeIoT Remote Control • Flask + HiveMQ + ESP32</footer></main><script>window.CSRF_TOKEN={{ csrf_token|tojson }};</script><script src="{{ url_for('static', filename='app.js') }}?v=20"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dashboard | HomeIoT</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}?v=21"
+    >
+</head>
+
+<body>
+
+    <button
+        class="mobile-menu"
+        onclick="toggleSidebar()"
+        aria-label="Open menu"
+    >
+        ☰
+    </button>
+
+    <aside class="sidebar" id="sidebar">
+
+        <div class="brand">
+            <div class="brand-icon">⌂</div>
+
+            <div>
+                <h2>HomeIoT</h2>
+                <span>Remote Control</span>
+            </div>
+        </div>
+
+        <nav>
+
+            <a href="{{ url_for('home') }}">
+                🏠 &nbsp; Home
+            </a>
+
+            <a href="{{ url_for('dashboard') }}" class="active">
+                ▦ &nbsp; Dashboard
+            </a>
+
+            <a href="#devices">
+                ◉ &nbsp; Devices
+            </a>
+
+            <a href="#monitoring">
+                ◌ &nbsp; Monitoring
+            </a>
+
+            <a href="{{ url_for('history') }}">
+                ◷ &nbsp; History
+            </a>
+
+            <a href="{{ url_for('settings') }}">
+                ⚙ &nbsp; Settings
+            </a>
+
+            {% if current_user and current_user['role'] == 'ADMIN' %}
+            <a href="{{ url_for('admin_users') }}">
+                ♙ &nbsp; Admin
+            </a>
+            {% endif %}
+
+        </nav>
+
+        <div class="sidebar-footer">
+
+            <div class="sidebar-user">
+
+                <div class="connection-dot"></div>
+
+                <div>
+                    <strong>{{ current_user['username'] }}</strong>
+                    <span>{{ current_user['role'] }} · Approved</span>
+                </div>
+
+            </div>
+
+            <form
+                class="logout-form"
+                method="post"
+                action="{{ url_for('logout') }}"
+            >
+
+                <input
+                    type="hidden"
+                    name="csrf_token"
+                    value="{{ csrf_token }}"
+                >
+
+                <button type="submit">
+                    ⇥ &nbsp; Logout
+                </button>
+
+            </form>
+
+        </div>
+
+    </aside>
+
+
+    <main class="main">
+
+        <header class="topbar">
+
+            <div>
+
+                <p class="eyebrow">
+                    REMOTE CONTROL
+                </p>
+
+                <h1>
+                    Home Dashboard
+                </h1>
+
+                <p class="subtitle">
+                    Control and monitor your connected appliances remotely.
+                </p>
+
+            </div>
+
+            <div id="mqttBadge" class="badge offline">
+                ● MQTT Offline
+            </div>
+
+        </header>
+
+
+        <section class="hero">
+
+            <div class="hero-content">
+
+                <p class="eyebrow">
+                    INTERNET OF THINGS
+                </p>
+
+                <h2>
+                    Control your home
+                    <span>from anywhere.</span>
+                </h2>
+
+                <p>
+                    Flask → HiveMQ Cloud → ESP32
+                </p>
+
+            </div>
+
+
+            <div class="hero-flow">
+
+                <div class="flow-item">
+
+                    <div class="flow-icon">
+                        ☁
+                    </div>
+
+                    <span>
+                        Flask
+                    </span>
+
+                </div>
+
+
+                <div class="flow-line"></div>
+
+
+                <div class="flow-item">
+
+                    <div class="flow-icon">
+                        ↔
+                    </div>
+
+                    <span>
+                        MQTT
+                    </span>
+
+                </div>
+
+
+                <div class="flow-line"></div>
+
+
+                <div class="flow-item">
+
+                    <div class="flow-icon">
+                        ▣
+                    </div>
+
+                    <span>
+                        ESP32
+                    </span>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <h2 class="section-title" id="devices">
+            Appliances
+        </h2>
+
+
+        <section class="devices">
+
+            {% for device, label, icon, desc in [
+                ('light', 'Light', '💡', 'Room lighting'),
+                ('fan', 'Fan / AC', '🌀', 'Cooling system'),
+                ('geyser', 'Geyser', '♨️', 'Water heating')
+            ] %}
+
+            <article class="card device-card">
+
+                <div class="device-top">
+
+                    <div class="icon">
+                        {{ icon }}
+                    </div>
+
+
+                    <div class="device-info">
+
+                        <h3>
+                            {{ label }}
+                        </h3>
+
+                        <p>
+                            {{ desc }}
+                        </p>
+
+                        <span
+                            id="{{ device }}State"
+                            class="state off"
+                        >
+                            OFF
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <div class="buttons">
+
+                    <button
+                        class="primary"
+                        onclick="controlDevice('{{ device }}', 'ON')"
+                    >
+                        ON
+                    </button>
+
+
+                    <button
+                        class="secondary"
+                        onclick="controlDevice('{{ device }}', 'OFF')"
+                    >
+                        OFF
+                    </button>
+
+                </div>
+
+            </article>
+
+            {% endfor %}
+
+        </section>
+
+
+        <h2 class="section-title" id="monitoring">
+            System Monitoring
+        </h2>
+
+
+        <section class="monitoring">
+
+            <article class="card monitor-card">
+
+                <div class="monitor-icon">
+                    ↔
+                </div>
+
+                <div>
+
+                    <span>
+                        MQTT
+                    </span>
+
+                    <strong id="mqttText">
+                        Offline
+                    </strong>
+
+                </div>
+
+            </article>
+
+
+            <article class="card monitor-card">
+
+                <div class="monitor-icon">
+                    °C
+                </div>
+
+                <div>
+
+                    <span>
+                        Temperature
+                    </span>
+
+                    <strong id="temperature">
+                        -- °C
+                    </strong>
+
+                </div>
+
+            </article>
+
+
+            <article class="card monitor-card">
+
+                <div class="monitor-icon">
+                    %
+                </div>
+
+                <div>
+
+                    <span>
+                        Humidity
+                    </span>
+
+                    <strong id="humidity">
+                        -- %
+                    </strong>
+
+                </div>
+
+            </article>
+
+
+            <article class="card monitor-card">
+
+                <div class="monitor-icon">
+                    ◉
+                </div>
+
+                <div>
+
+                    <span>
+                        Gas
+                    </span>
+
+                    <strong id="gas">
+                        NORMAL
+                    </strong>
+
+                </div>
+
+            </article>
+
+        </section>
+
+
+        <div id="message" class="message"></div>
+
+
+        <footer>
+            HomeIoT Remote Control • Flask + HiveMQ + ESP32
+        </footer>
+
+    </main>
+
+
+    <script>
+        window.CSRF_TOKEN = {{ csrf_token|tojson }};
+    </script>
+
+
+    <script
+        src="{{ url_for('static', filename='app.js') }}?v=21"
+    ></script>
+
+</body>
+</html>
