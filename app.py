@@ -90,7 +90,7 @@ TOPIC_STATUS = "home/status"
 
 
 # ============================================================
-# LIVE STATE
+# LOCAL LIVE STATE
 # ============================================================
 
 device_state = {
@@ -108,7 +108,7 @@ sensor_state = {
 
 
 # ============================================================
-# MQTT RUNTIME STATE
+# MQTT RUNTIME
 # ============================================================
 
 mqtt_client = None
@@ -133,6 +133,10 @@ def init_db():
     conn = get_db()
     cur = conn.cursor()
 
+    # --------------------------------------------------------
+    # USERS
+    # --------------------------------------------------------
+
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS users (
@@ -145,6 +149,10 @@ def init_db():
         )
         """
     )
+
+    # --------------------------------------------------------
+    # HISTORY
+    # --------------------------------------------------------
 
     cur.execute(
         """
@@ -159,6 +167,10 @@ def init_db():
         )
         """
     )
+
+    # --------------------------------------------------------
+    # LATEST ESP32 STATUS
+    # --------------------------------------------------------
 
     cur.execute(
         """
@@ -183,6 +195,10 @@ def init_db():
         """
     )
 
+    # --------------------------------------------------------
+    # HISTORY MIGRATION
+    # --------------------------------------------------------
+
     columns = {
         row["name"]
         for row in cur.execute(
@@ -191,6 +207,7 @@ def init_db():
     }
 
     if "event_type" not in columns:
+
         cur.execute(
             """
             ALTER TABLE history
@@ -198,6 +215,10 @@ def init_db():
             NOT NULL DEFAULT 'Device Control'
             """
         )
+
+    # --------------------------------------------------------
+    # ADMIN ACCOUNT
+    # --------------------------------------------------------
 
     existing_admin = cur.execute(
         """
@@ -209,6 +230,7 @@ def init_db():
     ).fetchone()
 
     if not existing_admin:
+
         cur.execute(
             """
             INSERT INTO users
@@ -237,7 +259,7 @@ def init_db():
 
 
 # ============================================================
-# LATEST STATUS
+# SHARED STATUS
 # ============================================================
 
 def read_latest_status():
@@ -262,6 +284,7 @@ def read_latest_status():
     conn.close()
 
     if not row:
+
         return (
             dict(device_state),
             dict(sensor_state),
@@ -311,42 +334,36 @@ def write_latest_status(
                     "OFF",
                 )
             ).upper(),
-
             str(
                 devices.get(
                     "fan",
                     "OFF",
                 )
             ).upper(),
-
             str(
                 devices.get(
                     "geyser",
                     "OFF",
                 )
             ).upper(),
-
             str(
                 sensors.get(
                     "temperature",
                     "--",
                 )
             ),
-
             str(
                 sensors.get(
                     "humidity",
                     "--",
                 )
             ),
-
             str(
                 sensors.get(
                     "gas",
                     "--",
                 )
             ),
-
             int(
                 sensors.get(
                     "gas_raw",
@@ -354,7 +371,6 @@ def write_latest_status(
                 )
                 or 0
             ),
-
             datetime.now().strftime(
                 "%Y-%m-%d %H:%M:%S"
             ),
@@ -408,6 +424,7 @@ def set_device_status(
 def get_csrf_token():
 
     if "csrf_token" not in session:
+
         session["csrf_token"] = (
             secrets.token_urlsafe(32)
         )
@@ -449,6 +466,7 @@ def protect_post_requests():
             expected,
         )
     ):
+
         return jsonify(
             {
                 "success": False,
@@ -542,6 +560,7 @@ def login_required(view):
         user = current_user()
 
         if not user:
+
             return redirect(
                 url_for("login")
             )
@@ -575,6 +594,7 @@ def admin_required(view):
         user = current_user()
 
         if not user:
+
             return redirect(
                 url_for("login")
             )
@@ -583,6 +603,7 @@ def admin_required(view):
             user["status"] != "ACTIVE"
             or user["role"] != "ADMIN"
         ):
+
             flash(
                 "Administrator access required.",
                 "error",
@@ -632,8 +653,7 @@ def mqtt_on_connect(
             try:
 
                 result, _ = client.subscribe(
-                    topic,
-                    qos=0
+                    topic
                 )
 
                 print(
@@ -745,45 +765,82 @@ def mqtt_on_message(
             read_latest_status()
         )
 
+        # ----------------------------------------------------
+        # DEVICE STATES
+        # ----------------------------------------------------
+
         if "light" in devices:
-            current_devices["light"] = str(
+
+            current_devices[
+                "light"
+            ] = str(
                 devices["light"]
             ).upper()
 
         if "fan" in devices:
-            current_devices["fan"] = str(
+
+            current_devices[
+                "fan"
+            ] = str(
                 devices["fan"]
             ).upper()
 
         if "geyser" in devices:
-            current_devices["geyser"] = str(
+
+            current_devices[
+                "geyser"
+            ] = str(
                 devices["geyser"]
             ).upper()
 
+        # ----------------------------------------------------
+        # SENSOR DATA
+        # ----------------------------------------------------
+
         if "temperature" in sensors:
-            current_sensors["temperature"] = (
-                sensors["temperature"]
-            )
+
+            current_sensors[
+                "temperature"
+            ] = sensors[
+                "temperature"
+            ]
 
         if "humidity" in sensors:
-            current_sensors["humidity"] = (
-                sensors["humidity"]
-            )
+
+            current_sensors[
+                "humidity"
+            ] = sensors[
+                "humidity"
+            ]
 
         if "gas" in sensors:
-            current_sensors["gas"] = (
-                sensors["gas"]
-            )
+
+            current_sensors[
+                "gas"
+            ] = sensors[
+                "gas"
+            ]
 
         if "gas_raw" in sensors:
-            current_sensors["gas_raw"] = (
-                sensors["gas_raw"]
-            )
+
+            current_sensors[
+                "gas_raw"
+            ] = sensors[
+                "gas_raw"
+            ]
+
+        # ----------------------------------------------------
+        # SAVE SHARED STATUS
+        # ----------------------------------------------------
 
         write_latest_status(
             current_devices,
             current_sensors,
         )
+
+        # ----------------------------------------------------
+        # UPDATE LOCAL CACHE
+        # ----------------------------------------------------
 
         with mqtt_lock:
 
@@ -865,10 +922,10 @@ def create_mqtt_client():
 
 
 # ============================================================
-# ACTUAL MQTT CONNECTION STATUS
+# MQTT CONNECTION CHECK
 # ============================================================
 
-def get_mqtt_connection_status():
+def ensure_mqtt_connection():
 
     global mqtt_connected
     global mqtt_last_error
@@ -879,6 +936,12 @@ def get_mqtt_connection_status():
 
         mqtt_connected = False
 
+        if not mqtt_last_error:
+
+            mqtt_last_error = (
+                "MQTT client is not initialized."
+            )
+
         return False
 
     try:
@@ -887,167 +950,27 @@ def get_mqtt_connection_status():
 
         mqtt_connected = connected
 
+        if connected:
+
+            mqtt_last_error = ""
+
         return connected
 
     except Exception as exc:
 
         mqtt_connected = False
+
         mqtt_last_error = (
             f"{type(exc).__name__}: {exc}"
         )
 
+        print(
+            "MQTT STATE CHECK ERROR:",
+            mqtt_last_error,
+            flush=True,
+        )
+
         return False
-
-
-# ============================================================
-# ENSURE MQTT CONNECTION
-# ============================================================
-
-def ensure_mqtt_connection():
-
-    global mqtt_client
-    global mqtt_connected
-    global mqtt_last_error
-
-    with mqtt_lock:
-
-        if mqtt_client is not None:
-
-            try:
-
-                if mqtt_client.is_connected():
-
-                    mqtt_connected = True
-                    mqtt_last_error = ""
-
-                    return True
-
-            except Exception as exc:
-
-                print(
-                    "MQTT STATE CHECK ERROR:",
-                    type(exc).__name__,
-                    str(exc),
-                    flush=True,
-                )
-
-        if not MQTT_BROKER:
-
-            mqtt_connected = False
-
-            mqtt_last_error = (
-                "MQTT_BROKER is empty."
-            )
-
-            return False
-
-        if not MQTT_USERNAME:
-
-            mqtt_connected = False
-
-            mqtt_last_error = (
-                "MQTT_USERNAME is empty."
-            )
-
-            return False
-
-        if not MQTT_PASSWORD:
-
-            mqtt_connected = False
-
-            mqtt_last_error = (
-                "MQTT_PASSWORD is empty."
-            )
-
-            return False
-
-        try:
-
-            print(
-                "Creating MQTT client for current worker...",
-                flush=True,
-            )
-
-            client = create_mqtt_client()
-
-            mqtt_client = client
-
-            print(
-                "Connecting MQTT worker to:",
-                MQTT_BROKER,
-                MQTT_PORT,
-                flush=True,
-            )
-
-            client.connect(
-                MQTT_BROKER,
-                MQTT_PORT,
-                60,
-            )
-
-            client.loop_start()
-
-            deadline = time.time() + 5
-
-            while time.time() < deadline:
-
-                try:
-
-                    if client.is_connected():
-
-                        mqtt_connected = True
-                        mqtt_last_error = ""
-
-                        print(
-                            "MQTT WORKER CONNECTED SUCCESSFULLY.",
-                            flush=True,
-                        )
-
-                        return True
-
-                except Exception:
-                    pass
-
-                time.sleep(0.1)
-
-            if client.is_connected():
-
-                mqtt_connected = True
-                mqtt_last_error = ""
-
-                return True
-
-            mqtt_connected = False
-
-            if not mqtt_last_error:
-
-                mqtt_last_error = (
-                    "MQTT connection did not complete."
-                )
-
-            print(
-                "MQTT WORKER CONNECTION TIMEOUT:",
-                mqtt_last_error,
-                flush=True,
-            )
-
-            return False
-
-        except Exception as exc:
-
-            mqtt_connected = False
-
-            mqtt_last_error = (
-                f"{type(exc).__name__}: {exc}"
-            )
-
-            print(
-                "MQTT WORKER CONNECTION ERROR:",
-                mqtt_last_error,
-                flush=True,
-            )
-
-            return False
 
 
 # ============================================================
@@ -1056,12 +979,147 @@ def ensure_mqtt_connection():
 
 def start_mqtt():
 
+    global mqtt_client
+    global mqtt_connected
+    global mqtt_last_error
+
     print(
         "Starting MQTT background client",
         flush=True,
     )
 
-    ensure_mqtt_connection()
+    if not MQTT_BROKER:
+
+        mqtt_connected = False
+        mqtt_last_error = (
+            "MQTT_BROKER is empty."
+        )
+
+        print(
+            "MQTT START ERROR:",
+            mqtt_last_error,
+            flush=True,
+        )
+
+        return
+
+    if not MQTT_USERNAME:
+
+        mqtt_connected = False
+        mqtt_last_error = (
+            "MQTT_USERNAME is empty."
+        )
+
+        print(
+            "MQTT START ERROR:",
+            mqtt_last_error,
+            flush=True,
+        )
+
+        return
+
+    if not MQTT_PASSWORD:
+
+        mqtt_connected = False
+        mqtt_last_error = (
+            "MQTT_PASSWORD is empty."
+        )
+
+        print(
+            "MQTT START ERROR:",
+            mqtt_last_error,
+            flush=True,
+        )
+
+        return
+
+    try:
+
+        client = create_mqtt_client()
+
+        mqtt_client = client
+
+        print(
+            "Connecting MQTT to:",
+            MQTT_BROKER,
+            MQTT_PORT,
+            flush=True,
+        )
+
+        client.connect(
+            MQTT_BROKER,
+            MQTT_PORT,
+            60,
+        )
+
+        client.loop_start()
+
+        print(
+            "MQTT NETWORK LOOP STARTED.",
+            flush=True,
+        )
+
+        deadline = time.time() + 5
+
+        while time.time() < deadline:
+
+            try:
+
+                if client.is_connected():
+
+                    mqtt_connected = True
+                    mqtt_last_error = ""
+
+                    print(
+                        "MQTT CONNECTED SUCCESSFULLY.",
+                        flush=True,
+                    )
+
+                    return
+
+            except Exception:
+                pass
+
+            time.sleep(0.1)
+
+        mqtt_connected = client.is_connected()
+
+        if mqtt_connected:
+
+            mqtt_last_error = ""
+
+            print(
+                "MQTT CONNECTED AFTER WAIT.",
+                flush=True,
+            )
+
+        else:
+
+            if not mqtt_last_error:
+
+                mqtt_last_error = (
+                    "MQTT connection did not complete."
+                )
+
+            print(
+                "MQTT CONNECTION TIMEOUT:",
+                mqtt_last_error,
+                flush=True,
+            )
+
+    except Exception as exc:
+
+        mqtt_connected = False
+
+        mqtt_last_error = (
+            f"{type(exc).__name__}: {exc}"
+        )
+
+        print(
+            "MQTT START ERROR:",
+            mqtt_last_error,
+            flush=True,
+        )
 
 
 # ============================================================
@@ -1092,6 +1150,10 @@ def publish_device_command(
         )
 
         return False
+
+    # --------------------------------------------------------
+    # CHECK EXISTING MQTT CONNECTION
+    # --------------------------------------------------------
 
     connected = ensure_mqtt_connection()
 
@@ -1124,15 +1186,7 @@ def publish_device_command(
 
     try:
 
-        connected_now = client.is_connected()
-
-        print(
-            "MQTT CLIENT CONNECTED:",
-            connected_now,
-            flush=True,
-        )
-
-        if not connected_now:
+        if not client.is_connected():
 
             print(
                 "MQTT COMMAND BLOCKED: client disconnected",
@@ -1144,7 +1198,7 @@ def publish_device_command(
         payload = action.upper()
 
         print(
-            "------------------------------------------------",
+            "================================================",
             flush=True,
         )
 
@@ -1177,16 +1231,21 @@ def publish_device_command(
         )
 
         print(
-            "MQTT COMMAND RETAIN: True",
+            "Retain: True",
             flush=True,
         )
 
-        # Keep QoS 0.
-        # Retain remains enabled from the current working test.
+        # ----------------------------------------------------
+        # IMPORTANT:
+        # QoS 0 + retain TRUE
+        #
+        # This is the configuration that previously worked
+        # for the Flask -> HiveMQ command path.
+        # ----------------------------------------------------
 
         result = client.publish(
-            topic=topic,
-            payload=payload,
+            topic,
+            payload,
             qos=0,
             retain=True,
         )
@@ -1213,10 +1272,14 @@ def publish_device_command(
 
             return False
 
+        # ----------------------------------------------------
+        # WAIT FOR PAHO TO PROCESS THE OUTGOING MESSAGE
+        # ----------------------------------------------------
+
         try:
 
             result.wait_for_publish(
-                timeout=3
+                timeout=5
             )
 
             print(
@@ -1224,14 +1287,34 @@ def publish_device_command(
                 flush=True,
             )
 
-        except Exception as exc:
+        except Exception as wait_error:
 
             print(
-                "MQTT PUBLISH WAIT ERROR:",
-                type(exc).__name__,
-                str(exc),
+                "MQTT WAIT WARNING:",
+                type(wait_error).__name__,
+                str(wait_error),
                 flush=True,
             )
+
+        if hasattr(
+            result,
+            "is_published",
+        ):
+
+            try:
+
+                published = (
+                    result.is_published()
+                )
+
+                print(
+                    "MQTT IS PUBLISHED:",
+                    published,
+                    flush=True,
+                )
+
+            except Exception:
+                pass
 
         print(
             "MQTT COMMAND ACCEPTED BY PAHO.",
@@ -1239,7 +1322,7 @@ def publish_device_command(
         )
 
         print(
-            "------------------------------------------------",
+            "================================================",
             flush=True,
         )
 
@@ -1523,13 +1606,11 @@ def dashboard():
         read_latest_status()
     )
 
-    mqtt_status = get_mqtt_connection_status()
-
     return render_template(
         "index.html",
         device_state=devices,
         sensor_state=sensors,
-        mqtt_connected=mqtt_status,
+        mqtt_connected=mqtt_connected,
     )
 
 
@@ -1547,13 +1628,11 @@ def devices():
         read_latest_status()
     )
 
-    mqtt_status = get_mqtt_connection_status()
-
     return render_template(
         "devices.html",
         device_state=devices,
         sensor_state=sensors,
-        mqtt_connected=mqtt_status,
+        mqtt_connected=mqtt_connected,
     )
 
 
@@ -1571,13 +1650,11 @@ def monitoring():
         read_latest_status()
     )
 
-    mqtt_status = get_mqtt_connection_status()
-
     return render_template(
         "monitoring.html",
         sensor_state=sensors,
         device_state=devices,
-        mqtt_connected=mqtt_status,
+        mqtt_connected=mqtt_connected,
     )
 
 
@@ -1771,13 +1848,7 @@ def admin_user_action(
 @login_required
 def api_status():
 
-    # First make sure this worker has a connection.
-    ensure_mqtt_connection()
-
-    # IMPORTANT:
-    # Read the actual Paho client connection state.
-    # This fixes the false "MQTT Offline" display.
-    connected = get_mqtt_connection_status()
+    connected = ensure_mqtt_connection()
 
     devices, sensors = (
         read_latest_status()
@@ -1796,11 +1867,7 @@ def api_status():
     return jsonify(
         {
             "mqtt_connected": connected,
-            "mqtt_error": (
-                ""
-                if connected
-                else mqtt_last_error
-            ),
+            "mqtt_error": mqtt_last_error,
             "devices": devices,
             "sensors": sensors,
         }
@@ -1853,6 +1920,10 @@ def api_device(
             }
         ), 400
 
+    # --------------------------------------------------------
+    # SEND MQTT COMMAND
+    # --------------------------------------------------------
+
     success = publish_device_command(
         device,
         action,
@@ -1862,6 +1933,10 @@ def api_device(
         "username",
         "Unknown",
     )
+
+    # --------------------------------------------------------
+    # SAVE HISTORY
+    # --------------------------------------------------------
 
     add_history(
         username,
@@ -1874,6 +1949,10 @@ def api_device(
         ),
         "Device Control",
     )
+
+    # --------------------------------------------------------
+    # UPDATE LOCAL/SHARED STATE
+    # --------------------------------------------------------
 
     if success:
 
@@ -1888,51 +1967,38 @@ def api_device(
                 device
             ] = action
 
-    connected = get_mqtt_connection_status()
+    # --------------------------------------------------------
+    # RESPONSE
+    # --------------------------------------------------------
 
     return jsonify(
         {
             "success": success,
             "device": device,
             "action": action,
-            "mqtt_connected": connected,
-            "mqtt_error": (
-                ""
-                if connected
-                else mqtt_last_error
-            ),
+            "mqtt_connected": mqtt_connected,
+            "mqtt_error": mqtt_last_error,
         }
     )
 
 
 # ============================================================
-# MQTT DEBUG API
+# MQTT DEBUG STATUS
 # ============================================================
 
 @app.route("/api/mqtt")
 @login_required
 def api_mqtt():
 
-    connected = get_mqtt_connection_status()
-
-    client_exists = (
-        mqtt_client is not None
-    )
+    connected = ensure_mqtt_connection()
 
     return jsonify(
         {
-            "broker": MQTT_BROKER,
-            "port": MQTT_PORT,
-            "username_configured": bool(
-                MQTT_USERNAME
-            ),
-            "password_configured": bool(
-                MQTT_PASSWORD
-            ),
-            "client_exists": client_exists,
             "connected": connected,
             "mqtt_connected": connected,
-            "last_error": mqtt_last_error,
+            "error": mqtt_last_error,
+            "broker": MQTT_BROKER,
+            "port": MQTT_PORT,
             "topics": {
                 "light": TOPIC_LIGHT,
                 "fan": TOPIC_FAN,
@@ -1950,7 +2016,7 @@ def api_mqtt():
 @app.route("/health")
 def health():
 
-    connected = get_mqtt_connection_status()
+    connected = ensure_mqtt_connection()
 
     return jsonify(
         {
