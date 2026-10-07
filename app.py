@@ -715,10 +715,6 @@ def on_connect(
         flush=True,
     )
 
-    # --------------------------------------------------------
-    # Subscribe to status and command topics.
-    # --------------------------------------------------------
-
     subscriptions = [
         TOPIC_LIGHT,
         TOPIC_FAN,
@@ -820,7 +816,6 @@ def on_message(
             ] = payload
 
         if msg.topic != TOPIC_STATUS:
-
             return
 
         data = json.loads(
@@ -847,10 +842,6 @@ def on_message(
             read_latest_status()
         )
 
-        # ----------------------------------------------------
-        # DEVICES
-        # ----------------------------------------------------
-
         for device in (
             "light",
             "fan",
@@ -868,10 +859,6 @@ def on_message(
                 ] = str(
                     value
                 ).upper()
-
-        # ----------------------------------------------------
-        # SENSORS
-        # ----------------------------------------------------
 
         if "temperature" in sensors:
 
@@ -905,18 +892,10 @@ def on_message(
                 "gas_raw"
             ]
 
-        # ----------------------------------------------------
-        # DATABASE
-        # ----------------------------------------------------
-
         write_latest_status(
             current_devices,
             current_sensors,
         )
-
-        # ----------------------------------------------------
-        # MEMORY
-        # ----------------------------------------------------
 
         with state_lock:
 
@@ -977,8 +956,6 @@ def on_message(
 
 # ============================================================
 # MQTT CLIENT
-#
-# THIS STRUCTURE MATCHES THE SUCCESSFUL PROJECT.
 # ============================================================
 
 mqtt_client = mqtt.Client(
@@ -1005,9 +982,6 @@ mqtt_client.reconnect_delay_set(
 
 # ============================================================
 # MQTT WORKER
-#
-# This is deliberately based on the previously successful
-# execution structure.
 # ============================================================
 
 def mqtt_worker():
@@ -1060,10 +1034,6 @@ def mqtt_worker():
 
         try:
 
-            # ------------------------------------------------
-            # CONNECT WHEN DISCONNECTED
-            # ------------------------------------------------
-
             if not mqtt_client.is_connected():
 
                 print(
@@ -1106,13 +1076,6 @@ def mqtt_worker():
 
                     continue
 
-            # ------------------------------------------------
-            # RUN MQTT NETWORK LOOP
-            #
-            # This is the important difference from the
-            # previous implementation.
-            # ------------------------------------------------
-
             mqtt_client.loop(
                 timeout=1.0
             )
@@ -1152,8 +1115,6 @@ mqtt_thread.start()
 
 # ============================================================
 # DEVICE COMMAND
-#
-# Directly follows the previously successful structure.
 # ============================================================
 
 def publish_device_command(
@@ -1178,10 +1139,6 @@ def publish_device_command(
         flush=True,
     )
 
-    # --------------------------------------------------------
-    # Validate device
-    # --------------------------------------------------------
-
     if device not in DEVICE_TOPICS:
 
         print(
@@ -1191,10 +1148,6 @@ def publish_device_command(
         )
 
         return False
-
-    # --------------------------------------------------------
-    # Validate action
-    # --------------------------------------------------------
 
     if action not in (
         "ON",
@@ -1214,10 +1167,6 @@ def publish_device_command(
     ]
 
     try:
-
-        # ----------------------------------------------------
-        # Check MQTT connection
-        # ----------------------------------------------------
 
         if not mqtt_client.is_connected():
 
@@ -1260,10 +1209,6 @@ def publish_device_command(
 
                 return False
 
-        # ----------------------------------------------------
-        # Direct publish
-        # ----------------------------------------------------
-
         print(
             "MQTT COMMAND TOPIC:",
             topic,
@@ -1282,15 +1227,20 @@ def publish_device_command(
         )
 
         print(
-            "MQTT COMMAND RETAIN: False",
+            "MQTT COMMAND RETAIN: True",
             flush=True,
         )
+
+        # ----------------------------------------------------
+        # TEST VERSION:
+        # QoS 0 + retain True
+        # ----------------------------------------------------
 
         result = mqtt_client.publish(
             topic,
             action,
             qos=0,
-            retain=False
+            retain=True
         )
 
         print(
@@ -2006,12 +1956,6 @@ def api_device(
         "Device Control",
     )
 
-    # --------------------------------------------------------
-    # IMPORTANT:
-    # We update the displayed state only after the MQTT
-    # publish was accepted by Paho.
-    # --------------------------------------------------------
-
     if success:
 
         set_device_status(
@@ -2077,7 +2021,7 @@ def health():
 
 
 # ============================================================
-# DATABASE INITIALIZATION
+# INITIALIZE DATABASE
 # ============================================================
 
 init_db()
