@@ -17,6 +17,7 @@ from flask import (
     jsonify,
     flash,
 )
+
 from werkzeug.security import generate_password_hash, check_password_hash
 import paho.mqtt.client as mqtt
 
@@ -33,6 +34,11 @@ app.secret_key = os.environ.get(
 )
 
 DATABASE = "home_iot.db"
+
+
+# ============================================================
+# MQTT CONFIGURATION
+# ============================================================
 
 MQTT_BROKER = os.environ.get(
     "MQTT_BROKER",
@@ -91,9 +97,10 @@ sensor_state = {
 }
 
 mqtt_connected = False
+mqtt_error = None
+mqtt_last_connected = None
 
 mqtt_client = None
-
 mqtt_lock = threading.Lock()
 
 
@@ -108,13 +115,8 @@ def get_db():
 
 
 def init_db():
-
     conn = get_db()
     cur = conn.cursor()
-
-    # --------------------------------------------------------
-    # USERS
-    # --------------------------------------------------------
 
     cur.execute(
         """
@@ -128,10 +130,6 @@ def init_db():
         )
         """
     )
-
-    # --------------------------------------------------------
-    # HISTORY
-    # --------------------------------------------------------
 
     cur.execute(
         """
@@ -147,10 +145,6 @@ def init_db():
         """
     )
 
-    # --------------------------------------------------------
-    # DATABASE MIGRATION
-    # --------------------------------------------------------
-
     columns = {
         row["name"]
         for row in cur.execute(
@@ -159,7 +153,6 @@ def init_db():
     }
 
     if "event_type" not in columns:
-
         cur.execute(
             """
             ALTER TABLE history
@@ -167,10 +160,6 @@ def init_db():
             NOT NULL DEFAULT 'Device Control'
             """
         )
-
-    # --------------------------------------------------------
-    # ADMIN ACCOUNT
-    # --------------------------------------------------------
 
     existing_admin = cur.execute(
         """
@@ -182,7 +171,6 @@ def init_db():
     ).fetchone()
 
     if not existing_admin:
-
         cur.execute(
             """
             INSERT INTO users
@@ -197,9 +185,7 @@ def init_db():
             """,
             (
                 ADMIN_USERNAME,
-                generate_password_hash(
-                    ADMIN_PASSWORD
-                ),
+                generate_password_hash(ADMIN_PASSWORD),
                 datetime.now().strftime(
                     "%Y-%m-%d %H:%M:%S"
                 ),
@@ -215,19 +201,14 @@ def init_db():
 # ============================================================
 
 def get_csrf_token():
-
     if "csrf_token" not in session:
-
-        session["csrf_token"] = (
-            secrets.token_urlsafe(32)
-        )
+        session["csrf_token"] = secrets.token_urlsafe(32)
 
     return session["csrf_token"]
 
 
 @app.context_processor
 def inject_template_values():
-
     return {
         "csrf_token": get_csrf_token(),
         "current_user": current_user(),
@@ -236,7 +217,6 @@ def inject_template_values():
 
 @app.before_request
 def protect_post_requests():
-
     if request.method != "POST":
         return None
 
@@ -255,7 +235,6 @@ def protect_post_requests():
             expected,
         )
     ):
-
         return jsonify(
             {
                 "success": False,
@@ -280,7 +259,6 @@ def add_history(
     result,
     event_type="Device Control",
 ):
-
     conn = get_db()
 
     conn.execute(
@@ -317,7 +295,6 @@ def add_history(
 # ============================================================
 
 def current_user():
-
     user_id = session.get("user_id")
 
     if not user_id:
@@ -340,19 +317,14 @@ def current_user():
 
 
 def login_required(view):
-
     @wraps(view)
     def wrapped(*args, **kwargs):
-
         user = current_user()
 
         if not user:
-            return redirect(
-                url_for("login")
-            )
+            return redirect(url_for("login"))
 
         if user["status"] != "ACTIVE":
-
             session.clear()
 
             flash(
@@ -360,9 +332,7 @@ def login_required(view):
                 "error",
             )
 
-            return redirect(
-                url_for("login")
-            )
+            return redirect(url_for("login"))
 
         return view(*args, **kwargs)
 
@@ -370,30 +340,23 @@ def login_required(view):
 
 
 def admin_required(view):
-
     @wraps(view)
     def wrapped(*args, **kwargs):
-
         user = current_user()
 
         if not user:
-            return redirect(
-                url_for("login")
-            )
+            return redirect(url_for("login"))
 
         if (
             user["status"] != "ACTIVE"
             or user["role"] != "ADMIN"
         ):
-
             flash(
                 "Administrator access required.",
                 "error",
             )
 
-            return redirect(
-                url_for("dashboard")
-            )
+            return redirect(url_for("dashboard"))
 
         return view(*args, **kwargs)
 
@@ -411,29 +374,68 @@ def mqtt_on_connect(
     reason_code,
     properties=None,
 ):
-
     global mqtt_connected
+    global mqtt_error
+    global mqtt_last_connected
 
-    if reason_code == 0:
-
-        mqtt_connected = True
-
-        client.subscribe(TOPIC_LIGHT)
-        client.subscribe(TOPIC_FAN)
-        client.subscribe(TOPIC_GEYSER)
-        client.subscribe(TOPIC_STATUS)
-
-        print(
-            "MQTT connected successfully"
+    try:
+        is_success = not getattr(
+            reason_code,
+            "is_failure",
+            False,
         )
 
-    else:
+        if reason_code == 0:
+            is_success = True
 
-        mqtt_connected = False
+        if is_success:
+            with mqtt_lock:
+                mqtt_connected = True
+                mqtt_error = None
+                mqtt_last_connected = datetime.now().strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
+
+            subscriptions = [
+                TOPIC_LIGHT,
+                TOPIC_FAN,
+                TOPIC_GEYSER,
+                TOPIC_STATUS,
+            ]
+
+            for topic in subscriptions:
+                result, _mid = client.subscribe(topic)
+
+                if result != mqtt.MQTT_ERR_SUCCESS:
+                    print(
+                        "MQTT subscribe failed:",
+                        topic,
+                        result,
+                    )
+
+            print(
+                "MQTT connected successfully:",
+                reason_code,
+            )
+
+        else:
+            with mqtt_lock:
+                mqtt_connected = False
+                mqtt_error = f"Connection failed: {reason_code}"
+
+            print(
+                "MQTT connection failed:",
+                reason_code,
+            )
+
+    except Exception as exc:
+        with mqtt_lock:
+            mqtt_connected = False
+            mqtt_error = str(exc)
 
         print(
-            "MQTT connection failed:",
-            reason_code,
+            "MQTT connect callback error:",
+            exc,
         )
 
 
@@ -444,10 +446,16 @@ def mqtt_on_disconnect(
     reason_code,
     properties=None,
 ):
-
     global mqtt_connected
+    global mqtt_error
 
-    mqtt_connected = False
+    with mqtt_lock:
+        mqtt_connected = False
+
+        if reason_code:
+            mqtt_error = f"Disconnected: {reason_code}"
+        else:
+            mqtt_error = "Disconnected from MQTT broker"
 
     print(
         "MQTT disconnected:",
@@ -460,15 +468,11 @@ def mqtt_on_message(
     userdata,
     msg,
 ):
-
     global device_state
     global sensor_state
 
     try:
-
-        payload = msg.payload.decode(
-            "utf-8"
-        )
+        payload = msg.payload.decode("utf-8")
 
         if msg.topic != TOPIC_STATUS:
             return
@@ -478,43 +482,34 @@ def mqtt_on_message(
         with mqtt_lock:
 
             if "light" in data:
-                device_state["light"] = (
-                    str(
-                        data["light"]
-                    ).upper()
-                )
+                device_state["light"] = str(
+                    data["light"]
+                ).upper()
 
             if "fan" in data:
-                device_state["fan"] = (
-                    str(
-                        data["fan"]
-                    ).upper()
-                )
+                device_state["fan"] = str(
+                    data["fan"]
+                ).upper()
 
             if "geyser" in data:
-                device_state["geyser"] = (
-                    str(
-                        data["geyser"]
-                    ).upper()
-                )
+                device_state["geyser"] = str(
+                    data["geyser"]
+                ).upper()
 
             if "temperature" in data:
-                sensor_state["temperature"] = (
-                    data["temperature"]
-                )
+                sensor_state["temperature"] = data[
+                    "temperature"
+                ]
 
             if "humidity" in data:
-                sensor_state["humidity"] = (
-                    data["humidity"]
-                )
+                sensor_state["humidity"] = data[
+                    "humidity"
+                ]
 
             if "gas" in data:
-                sensor_state["gas"] = (
-                    data["gas"]
-                )
+                sensor_state["gas"] = data["gas"]
 
     except Exception as exc:
-
         print(
             "MQTT message error:",
             exc,
@@ -522,13 +517,28 @@ def mqtt_on_message(
 
 
 def start_mqtt():
-
     global mqtt_client
+    global mqtt_connected
+    global mqtt_error
 
     try:
+        if not MQTT_BROKER:
+            raise RuntimeError(
+                "MQTT_BROKER environment variable is empty."
+            )
+
+        if not MQTT_USERNAME:
+            raise RuntimeError(
+                "MQTT_USERNAME environment variable is empty."
+            )
+
+        if not MQTT_PASSWORD:
+            raise RuntimeError(
+                "MQTT_PASSWORD environment variable is empty."
+            )
 
         client = mqtt.Client(
-            mqtt.CallbackAPIVersion.VERSION2,
+            callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
             client_id=(
                 f"home-iot-flask-"
                 f"{int(time.time())}"
@@ -543,12 +553,16 @@ def start_mqtt():
         client.tls_set()
 
         client.on_connect = mqtt_on_connect
-        client.on_disconnect = (
-            mqtt_on_disconnect
-        )
+        client.on_disconnect = mqtt_on_disconnect
         client.on_message = mqtt_on_message
 
         mqtt_client = client
+
+        print(
+            "Starting MQTT connection:",
+            MQTT_BROKER,
+            MQTT_PORT,
+        )
 
         client.connect(
             MQTT_BROKER,
@@ -563,10 +577,13 @@ def start_mqtt():
         )
 
     except Exception as exc:
+        with mqtt_lock:
+            mqtt_connected = False
+            mqtt_error = str(exc)
 
         print(
             "MQTT startup error:",
-            exc,
+            repr(exc),
         )
 
 
@@ -574,7 +591,6 @@ def publish_device_command(
     device,
     action,
 ):
-
     topics = {
         "light": TOPIC_LIGHT,
         "fan": TOPIC_FAN,
@@ -586,27 +602,44 @@ def publish_device_command(
     if not topic:
         return False
 
-    if (
-        not mqtt_client
-        or not mqtt_connected
-    ):
+    client = mqtt_client
+
+    if not client:
+        print("MQTT publish failed: client unavailable")
+        return False
+
+    with mqtt_lock:
+        connected = mqtt_connected
+
+    if not connected:
+        print(
+            "MQTT publish failed: broker not connected"
+        )
         return False
 
     try:
-
-        result = mqtt_client.publish(
+        result = client.publish(
             topic,
             action.upper(),
             qos=0,
         )
 
-        return (
-            result.rc
-            == mqtt.MQTT_ERR_SUCCESS
+        if result.rc == mqtt.MQTT_ERR_SUCCESS:
+            print(
+                "MQTT command published:",
+                topic,
+                action.upper(),
+            )
+            return True
+
+        print(
+            "MQTT publish returned error:",
+            result.rc,
         )
 
-    except Exception as exc:
+        return False
 
+    except Exception as exc:
         print(
             "MQTT publish error:",
             exc,
@@ -621,16 +654,10 @@ def publish_device_command(
 
 @app.route("/")
 def home():
-
     if current_user():
+        return redirect(url_for("dashboard"))
 
-        return redirect(
-            url_for("dashboard")
-        )
-
-    return render_template(
-        "home.html"
-    )
+    return render_template("home.html")
 
 
 # ============================================================
@@ -642,7 +669,6 @@ def home():
     methods=["GET", "POST"],
 )
 def signup():
-
     if request.method == "POST":
 
         username = request.form.get(
@@ -655,48 +681,34 @@ def signup():
             "",
         )
 
-        confirm_password = (
-            request.form.get(
-                "confirm_password",
-                "",
-            )
+        confirm_password = request.form.get(
+            "confirm_password",
+            "",
         )
 
         if not username or not password:
-
             flash(
                 "Username and password are required.",
                 "error",
             )
 
-            return redirect(
-                url_for("signup")
-            )
+            return redirect(url_for("signup"))
 
         if len(password) < 8:
-
             flash(
                 "Password must contain at least 8 characters.",
                 "error",
             )
 
-            return redirect(
-                url_for("signup")
-            )
+            return redirect(url_for("signup"))
 
-        if (
-            confirm_password
-            and password != confirm_password
-        ):
-
+        if confirm_password and password != confirm_password:
             flash(
                 "Passwords do not match.",
                 "error",
             )
 
-            return redirect(
-                url_for("signup")
-            )
+            return redirect(url_for("signup"))
 
         conn = get_db()
 
@@ -710,7 +722,6 @@ def signup():
         ).fetchone()
 
         if existing:
-
             conn.close()
 
             flash(
@@ -718,9 +729,7 @@ def signup():
                 "error",
             )
 
-            return redirect(
-                url_for("signup")
-            )
+            return redirect(url_for("signup"))
 
         conn.execute(
             """
@@ -736,9 +745,7 @@ def signup():
             """,
             (
                 username,
-                generate_password_hash(
-                    password
-                ),
+                generate_password_hash(password),
                 datetime.now().strftime(
                     "%Y-%m-%d %H:%M:%S"
                 ),
@@ -753,9 +760,7 @@ def signup():
             username=username,
         )
 
-    return render_template(
-        "signup.html"
-    )
+    return render_template("signup.html")
 
 
 # ============================================================
@@ -763,7 +768,6 @@ def signup():
 # ============================================================
 
 def signin_handler():
-
     if request.method == "POST":
 
         username = request.form.get(
@@ -796,26 +800,20 @@ def signin_handler():
                 password,
             )
         ):
-
             flash(
                 "Invalid username or password.",
                 "error",
             )
 
-            return redirect(
-                url_for("login")
-            )
+            return redirect(url_for("login"))
 
         if user["status"] != "ACTIVE":
-
             flash(
                 "Your account is waiting for administrator approval.",
                 "error",
             )
 
-            return redirect(
-                url_for("login")
-            )
+            return redirect(url_for("login"))
 
         session.clear()
 
@@ -825,13 +823,9 @@ def signin_handler():
 
         get_csrf_token()
 
-        return redirect(
-            url_for("dashboard")
-        )
+        return redirect(url_for("dashboard"))
 
-    return render_template(
-        "login.html"
-    )
+    return render_template("login.html")
 
 
 @app.route(
@@ -839,7 +833,6 @@ def signin_handler():
     methods=["GET", "POST"],
 )
 def login():
-
     return signin_handler()
 
 
@@ -848,7 +841,6 @@ def login():
     methods=["GET", "POST"],
 )
 def signin():
-
     return signin_handler()
 
 
@@ -861,12 +853,9 @@ def signin():
     methods=["POST"],
 )
 def logout():
-
     session.clear()
 
-    return redirect(
-        url_for("home")
-    )
+    return redirect(url_for("home"))
 
 
 # ============================================================
@@ -876,12 +865,14 @@ def logout():
 @app.route("/dashboard")
 @login_required
 def dashboard():
+    with mqtt_lock:
+        connected = mqtt_connected
 
     return render_template(
         "index.html",
         device_state=device_state,
         sensor_state=sensor_state,
-        mqtt_connected=mqtt_connected,
+        mqtt_connected=connected,
     )
 
 
@@ -892,11 +883,13 @@ def dashboard():
 @app.route("/devices")
 @login_required
 def devices():
+    with mqtt_lock:
+        connected = mqtt_connected
 
     return render_template(
         "devices.html",
         device_state=device_state,
-        mqtt_connected=mqtt_connected,
+        mqtt_connected=connected,
     )
 
 
@@ -907,12 +900,14 @@ def devices():
 @app.route("/monitoring")
 @login_required
 def monitoring():
+    with mqtt_lock:
+        connected = mqtt_connected
 
     return render_template(
         "monitoring.html",
         sensor_state=sensor_state,
         device_state=device_state,
-        mqtt_connected=mqtt_connected,
+        mqtt_connected=connected,
     )
 
 
@@ -923,7 +918,6 @@ def monitoring():
 @app.route("/history")
 @login_required
 def history():
-
     conn = get_db()
 
     rows = conn.execute(
@@ -957,7 +951,6 @@ def history():
 @app.route("/settings")
 @login_required
 def settings():
-
     return render_template(
         "settings.html"
     )
@@ -970,7 +963,6 @@ def settings():
 @app.route("/admin")
 @admin_required
 def admin_users():
-
     conn = get_db()
 
     users = conn.execute(
@@ -1003,21 +995,17 @@ def admin_user_action(
     user_id,
     action,
 ):
-
     if action not in {
         "approve",
         "reject",
         "disable",
     }:
-
         flash(
             "Invalid user action.",
             "error",
         )
 
-        return redirect(
-            url_for("admin_users")
-        )
+        return redirect(url_for("admin_users"))
 
     conn = get_db()
 
@@ -1031,7 +1019,6 @@ def admin_user_action(
     ).fetchone()
 
     if not user:
-
         conn.close()
 
         flash(
@@ -1039,12 +1026,9 @@ def admin_user_action(
             "error",
         )
 
-        return redirect(
-            url_for("admin_users")
-        )
+        return redirect(url_for("admin_users"))
 
     if user["role"] == "ADMIN":
-
         conn.close()
 
         flash(
@@ -1052,9 +1036,7 @@ def admin_user_action(
             "error",
         )
 
-        return redirect(
-            url_for("admin_users")
-        )
+        return redirect(url_for("admin_users"))
 
     new_status = {
         "approve": "ACTIVE",
@@ -1093,9 +1075,7 @@ def admin_user_action(
         "success",
     )
 
-    return redirect(
-        url_for("admin_users")
-    )
+    return redirect(url_for("admin_users"))
 
 
 # ============================================================
@@ -1105,20 +1085,23 @@ def admin_user_action(
 @app.route("/api/status")
 @login_required
 def api_status():
-
     with mqtt_lock:
+        connected = mqtt_connected
+        error = mqtt_error
+        last_connected = mqtt_last_connected
 
-        return jsonify(
-            {
-                "mqtt_connected": mqtt_connected,
-                "devices": dict(
-                    device_state
-                ),
-                "sensors": dict(
-                    sensor_state
-                ),
-            }
-        )
+        devices_copy = dict(device_state)
+        sensors_copy = dict(sensor_state)
+
+    return jsonify(
+        {
+            "mqtt_connected": connected,
+            "mqtt_error": error,
+            "mqtt_last_connected": last_connected,
+            "devices": devices_copy,
+            "sensors": sensors_copy,
+        }
+    )
 
 
 # ============================================================
@@ -1134,7 +1117,6 @@ def api_device(
     device,
     action,
 ):
-
     device = device.lower()
     action = action.upper()
 
@@ -1150,7 +1132,6 @@ def api_device(
     }
 
     if device not in allowed_devices:
-
         return jsonify(
             {
                 "success": False,
@@ -1159,7 +1140,6 @@ def api_device(
         ), 400
 
     if action not in allowed_actions:
-
         return jsonify(
             {
                 "success": False,
@@ -1186,17 +1166,19 @@ def api_device(
     )
 
     if success:
-
         with mqtt_lock:
-
             device_state[device] = action
+
+    with mqtt_lock:
+        connected = mqtt_connected
 
     return jsonify(
         {
             "success": success,
             "device": device,
             "action": action,
-            "mqtt_connected": mqtt_connected,
+            "mqtt_connected": connected,
+            "mqtt_error": mqtt_error,
         }
     )
 
@@ -1208,11 +1190,8 @@ def api_device(
 init_db()
 
 try:
-
     start_mqtt()
-
 except Exception as exc:
-
     print(
         "MQTT initialization error:",
         exc,
@@ -1224,7 +1203,6 @@ except Exception as exc:
 # ============================================================
 
 if __name__ == "__main__":
-
     app.run(
         host="0.0.0.0",
         port=int(
