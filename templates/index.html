@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home Remote Control</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=10">
+</head>
+<body>
+<aside class="sidebar">
+ <div class="brand"><div class="brand-icon">⌂</div><div><h2>HomeIoT</h2><span>Remote Control</span></div></div>
+ <nav>
+  <a class="active">▦ &nbsp; Dashboard</a><a>◉ &nbsp; Devices</a><a>◌ &nbsp; Monitoring</a><a>◷ &nbsp; History</a><a>⚙ &nbsp; Settings</a>
+ </nav>
+ <div class="sidebar-footer"><div class="connection-dot"></div><div><strong>System Online</strong><span>Cloud connected</span></div></div>
+</aside>
+<main class="main">
+<header class="topbar"><div><p class="eyebrow">REMOTE CONTROL</p><h1>Home Dashboard</h1><p class="subtitle">Control and monitor your connected appliances remotely.</p></div><div id="mqttBadge" class="badge offline">● MQTT Offline</div></header>
+<section class="hero">
+ <div class="hero-content"><p class="eyebrow">INTERNET OF THINGS</p><h2>Control your home <span>from anywhere.</span></h2><p>Flask → HiveMQ Cloud → ESP32</p></div>
+ <div class="hero-flow"><div class="flow-item"><div class="flow-icon">☁</div><span>Flask</span></div><div class="flow-line"></div><div class="flow-item"><div class="flow-icon">↔</div><span>MQTT</span></div><div class="flow-line"></div><div class="flow-item"><div class="flow-icon">▣</div><span>ESP32</span></div></div>
+</section>
+<h2 class="section-title">Appliances</h2>
+<section class="devices">
+{% for device,label,icon,desc in [('light','Light','💡','Room lighting'),('fan','Fan / AC','🌀','Cooling system'),('geyser','Geyser','♨️','Water heating')] %}
+<article class="card device-card">
+ <div class="device-top"><div class="icon">{{icon}}</div><div class="device-info"><h3>{{label}}</h3><p>{{desc}}</p><span id="{{device}}State" class="state off">OFF</span></div></div>
+ <div class="buttons"><button class="primary" onclick="controlDevice('{{device}}','ON')">ON</button><button class="secondary" onclick="controlDevice('{{device}}','OFF')">OFF</button></div>
+</article>
+{% endfor %}
+</section>
+<h2 class="section-title">System Monitoring</h2>
+<section class="monitoring">
+<article class="card monitor-card"><div class="monitor-icon">↔</div><div><span>MQTT</span><strong id="mqttText">Offline</strong></div></article>
+<article class="card monitor-card"><div class="monitor-icon">°C</div><div><span>Temperature</span><strong id="temperature">-- °C</strong></div></article>
+<article class="card monitor-card"><div class="monitor-icon">%</div><div><span>Humidity</span><strong id="humidity">-- %</strong></div></article>
+<article class="card monitor-card"><div class="monitor-icon">◉</div><div><span>Gas</span><strong id="gas">NORMAL</strong></div></article>
+</section>
+<div id="message" class="message"></div>
+<footer>HomeIoT Remote Control • Flask + HiveMQ + ESP32</footer>
+</main>
+<script src="{{ url_for('static', filename='app.js') }}?v=10"></script>
+</body>
+</html>
