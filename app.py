@@ -3,12 +3,174 @@ import json
 import uuid
 import time
 import threading
+import sqlite3
+import secrets
+from functools import wraps
+from datetime import datetime, timezone
 
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request, redirect, url_for, session, flash
+from werkzeug.security import generate_password_hash, check_password_hash
 import paho.mqtt.client as mqtt
 
 
 app = Flask(__name__)
+
+# ============================================================
+# SECURITY / DATABASE CONFIGURATION
+# ============================================================
+
+app.secret_key = os.getenv("SECRET_KEY", "")
+if not app.secret_key:
+    # Development fallback only. Set SECRET_KEY in Render for deployment.
+    app.secret_key = secrets.token_hex(32)
+
+DATABASE_PATH = os.getenv(
+    "DATABASE_PATH",
+    os.path.join(os.path.dirname(__file__), "data", "homeiot.db")
+)
+
+os.makedirs(os.path.dirname(DATABASE_PATH) or ".", exist_ok=True)
+
+
+def db_connection():
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_database():
+    conn = db_connection()
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'USER',
+                status TEXT NOT NULL DEFAULT 'PENDING',
+                created_at TEXT NOT NULL,
+                approved_at TEXT,
+                approved_by TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
+                device TEXT,
+                action TEXT,
+                event_type TEXT NOT NULL,
+                result TEXT NOT NULL,
+                details TEXT,
+                created_at TEXT NOT NULL
+            )
+        """)
+        conn.commit()
+
+        admin_username = os.getenv("ADMIN_USERNAME", "").strip()
+        admin_password = os.getenv("ADMIN_PASSWORD", "")
+
+        if admin_username and admin_password:
+            existing = conn.execute(
+                "SELECT id FROM users WHERE username = ?",
+                (admin_username,)
+            ).fetchone()
+            now = datetime.now(timezone.utc).isoformat()
+            if existing is None:
+                conn.execute(
+                    """INSERT INTO users
+                       (username, password_hash, role, status, created_at, approved_at, approved_by)
+                       VALUES (?, ?, 'ADMIN', 'ACTIVE', ?, ?, ?)""",
+                    (admin_username, generate_password_hash(admin_password), now, now, admin_username)
+                )
+                conn.commit()
+            else:
+                conn.execute(
+                    "UPDATE users SET role='ADMIN', status='ACTIVE' WHERE username = ?",
+                    (admin_username,)
+                )
+                conn.commit()
+    finally:
+        conn.close()
+
+
+def current_user():
+    user_id = session.get("user_id")
+    if not user_id:
+        return None
+    conn = db_connection()
+    try:
+        return conn.execute(
+            "SELECT id, username, role, status FROM users WHERE id = ?",
+            (user_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+
+
+def login_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        user = current_user()
+        if user is None:
+            return redirect(url_for("login", next=request.path))
+        if user["status"] != "ACTIVE":
+            session.clear()
+            flash("Your account is not currently approved for access.", "error")
+            return redirect(url_for("login"))
+        return view(*args, **kwargs)
+    return wrapped
+
+
+def admin_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        user = current_user()
+        if user is None:
+            return redirect(url_for("login", next=request.path))
+        if user["status"] != "ACTIVE" or user["role"] != "ADMIN":
+            return jsonify({"success": False, "error": "Administrator access required"}), 403
+        return view(*args, **kwargs)
+    return wrapped
+
+
+def csrf_token():
+    token = session.get("csrf_token")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["csrf_token"] = token
+    return token
+
+
+def valid_csrf():
+    supplied = request.form.get("csrf_token") or request.headers.get("X-CSRF-Token")
+    return bool(supplied and secrets.compare_digest(supplied, session.get("csrf_token", "")))
+
+
+def record_history(username, event_type, result, device=None, action=None, details=None):
+    conn = db_connection()
+    try:
+        conn.execute(
+            """INSERT INTO history
+               (username, device, action, event_type, result, details, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (username, device, action, event_type, result, details, datetime.now(timezone.utc).isoformat())
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+@app.context_processor
+def inject_user_context():
+    user = current_user()
+    return {
+        "current_user": user,
+        "csrf_token": csrf_token()
+    }
+
+
+init_database()
 
 
 # ============================================================
@@ -605,17 +767,113 @@ def publish_command(
 
 
 # ============================================================
-# DASHBOARD
+# PUBLIC HOME / AUTHENTICATION
 # ============================================================
 
 @app.route("/")
+def home():
+    if current_user() is not None:
+        return redirect(url_for("dashboard"))
+    return render_template("home.html")
+
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if request.method == "POST":
+        if not valid_csrf():
+            return render_template("signup.html", error="Security check failed. Please try again.")
+
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        confirm = request.form.get("confirm_password", "")
+
+        if len(username) < 3 or len(username) > 50:
+            return render_template("signup.html", error="Username must be between 3 and 50 characters.")
+        if len(password) < 8:
+            return render_template("signup.html", error="Password must contain at least 8 characters.")
+        if password != confirm:
+            return render_template("signup.html", error="Passwords do not match.")
+
+        conn = db_connection()
+        try:
+            exists = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+            if exists:
+                return render_template("signup.html", error="That username is already registered.")
+            conn.execute(
+                """INSERT INTO users (username, password_hash, role, status, created_at)
+                   VALUES (?, ?, 'USER', 'PENDING', ?)""",
+                (username, generate_password_hash(password), datetime.now(timezone.utc).isoformat())
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        record_history(username, "ACCOUNT", "PENDING", details="New user registration awaiting administrator approval")
+        return render_template("signup_success.html", username=username)
+
+    return render_template("signup.html")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if current_user() is not None:
+        return redirect(url_for("dashboard"))
+
+    if request.method == "POST":
+        if not valid_csrf():
+            return render_template("login.html", error="Security check failed. Please try again.")
+
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+
+        conn = db_connection()
+        try:
+            user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        finally:
+            conn.close()
+
+        if user is None or not check_password_hash(user["password_hash"], password):
+            return render_template("login.html", error="Invalid username or password.")
+
+        if user["status"] == "PENDING":
+            return render_template("login.html", error="Your account is awaiting administrator approval.")
+        if user["status"] in ("REJECTED", "DISABLED"):
+            return render_template("login.html", error="Your account is not approved for access.")
+
+        session.clear()
+        session["user_id"] = user["id"]
+        session["csrf_token"] = secrets.token_urlsafe(32)
+        record_history(user["username"], "LOGIN", "SUCCESS")
+
+        next_url = request.args.get("next") or request.form.get("next")
+        if next_url and next_url.startswith("/"):
+            return redirect(next_url)
+        return redirect(url_for("dashboard"))
+
+    return render_template("login.html", next=request.args.get("next", ""))
+
+
+@app.route("/logout", methods=["POST"])
+@login_required
+def logout():
+    if not valid_csrf():
+        return jsonify({"success": False, "error": "Security check failed"}), 400
+    user = current_user()
+    if user:
+        record_history(user["username"], "LOGOUT", "SUCCESS")
+    session.clear()
+    return redirect(url_for("home"))
+
+
+# ============================================================
+# DASHBOARD
+# ============================================================
+
+@app.route("/dashboard")
+@login_required
 def dashboard():
-
     ensure_status_client()
-
-    return render_template(
-        "index.html"
-    )
+    return render_template("index.html")
 
 
 # ============================================================
@@ -623,6 +881,7 @@ def dashboard():
 # ============================================================
 
 @app.route("/api/status")
+@login_required
 def api_status():
 
     ensure_status_client()
@@ -719,6 +978,7 @@ def api_status():
     "/api/device/<device>/<action>",
     methods=["POST"]
 )
+@login_required
 def control_device(
     device,
     action
@@ -756,13 +1016,30 @@ def control_device(
             "error": "Invalid action"
         }), 400
 
+    if not valid_csrf():
+
+        return jsonify({
+            "success": False,
+            "error": "Security check failed"
+        }), 400
+
     success = publish_command(
         topics[device],
         action
     )
 
+    user = current_user()
+
     if not success:
 
+        record_history(
+            user["username"],
+            "DEVICE",
+            "FAILED",
+            device=device,
+            action=action,
+            details=last_error or "MQTT command failed"
+        )
         return jsonify({
             "success": False,
             "error": (
@@ -770,6 +1047,15 @@ def control_device(
                 "MQTT command failed"
             )
         }), 503
+
+    record_history(
+        user["username"],
+        "DEVICE",
+        "SUCCESS",
+        device=device,
+        action=action,
+        details="MQTT command published"
+    )
 
     return jsonify({
 
@@ -788,10 +1074,96 @@ def control_device(
 
 
 # ============================================================
+# HISTORY / SETTINGS / ADMIN
+# ============================================================
+
+@app.route("/history")
+@login_required
+def history():
+    user = current_user()
+    conn = db_connection()
+    try:
+        if user["role"] == "ADMIN":
+            rows = conn.execute(
+                "SELECT * FROM history ORDER BY id DESC LIMIT 200"
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM history WHERE username = ? ORDER BY id DESC LIMIT 200",
+                (user["username"],)
+            ).fetchall()
+    finally:
+        conn.close()
+    return render_template("history.html", history=rows)
+
+
+@app.route("/settings")
+@login_required
+def settings():
+    return render_template("settings.html")
+
+
+@app.route("/admin/users")
+@admin_required
+def admin_users():
+    conn = db_connection()
+    try:
+        users = conn.execute(
+            "SELECT id, username, role, status, created_at, approved_at, approved_by FROM users ORDER BY id DESC"
+        ).fetchall()
+    finally:
+        conn.close()
+    return render_template("admin_users.html", users=users)
+
+
+@app.route("/admin/users/<int:user_id>/<action>", methods=["POST"])
+@admin_required
+def admin_user_action(user_id, action):
+    if not valid_csrf():
+        return jsonify({"success": False, "error": "Security check failed"}), 400
+
+    admin = current_user()
+    if action not in ("approve", "reject", "disable"):
+        return jsonify({"success": False, "error": "Invalid action"}), 400
+
+    conn = db_connection()
+    try:
+        target = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        if target is None:
+            return jsonify({"success": False, "error": "User not found"}), 404
+        if target["role"] == "ADMIN":
+            return jsonify({"success": False, "error": "Admin accounts cannot be changed here"}), 400
+
+        now = datetime.now(timezone.utc).isoformat()
+        if action == "approve":
+            conn.execute(
+                "UPDATE users SET status='ACTIVE', approved_at=?, approved_by=? WHERE id=?",
+                (now, admin["username"], user_id)
+            )
+            result = "APPROVED"
+        elif action == "reject":
+            conn.execute(
+                "UPDATE users SET status='REJECTED', approved_at=NULL, approved_by=? WHERE id=?",
+                (admin["username"], user_id)
+            )
+            result = "REJECTED"
+        else:
+            conn.execute("UPDATE users SET status='DISABLED' WHERE id=?", (user_id,))
+            result = "DISABLED"
+        conn.commit()
+    finally:
+        conn.close()
+
+    record_history(admin["username"], "USER", result, details=f"User: {target['username']}")
+    return redirect(url_for("admin_users"))
+
+
+# ============================================================
 # HEALTH
 # ============================================================
 
 @app.route("/health")
+@login_required
 def health():
 
     ensure_status_client()
