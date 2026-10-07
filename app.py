@@ -922,165 +922,53 @@ def create_mqtt_client():
 
 
 # ============================================================
-# ENSURE MQTT CONNECTION
+# MQTT CONNECTION STATE
 # ============================================================
 
 def ensure_mqtt_connection():
 
-    global mqtt_client
     global mqtt_connected
     global mqtt_last_error
 
-    with mqtt_lock:
+    client = mqtt_client
 
-        # ----------------------------------------------------
-        # Existing MQTT client
-        # ----------------------------------------------------
+    if client is None:
 
-        if mqtt_client is not None:
+        mqtt_connected = False
 
-            try:
-
-                if mqtt_client.is_connected():
-
-                    mqtt_connected = True
-
-                    return True
-
-            except Exception as exc:
-
-                print(
-                    "MQTT STATE CHECK ERROR:",
-                    type(exc).__name__,
-                    str(exc),
-                    flush=True,
-                )
-
-        # ----------------------------------------------------
-        # Configuration validation
-        # ----------------------------------------------------
-
-        if not MQTT_BROKER:
-
-            mqtt_connected = False
-
+        if not mqtt_last_error:
             mqtt_last_error = (
-                "MQTT_BROKER is empty."
+                "MQTT client is not initialized."
             )
 
-            return False
+        return False
 
-        if not MQTT_USERNAME:
+    try:
 
-            mqtt_connected = False
+        connected = client.is_connected()
 
-            mqtt_last_error = (
-                "MQTT_USERNAME is empty."
-            )
+        mqtt_connected = connected
 
-            return False
+        if connected:
+            mqtt_last_error = ""
 
-        if not MQTT_PASSWORD:
+        return connected
 
-            mqtt_connected = False
+    except Exception as exc:
 
-            mqtt_last_error = (
-                "MQTT_PASSWORD is empty."
-            )
+        mqtt_connected = False
 
-            return False
+        mqtt_last_error = (
+            f"{type(exc).__name__}: {exc}"
+        )
 
-        # ----------------------------------------------------
-        # Create MQTT client
-        # ----------------------------------------------------
+        print(
+            "MQTT STATE CHECK ERROR:",
+            mqtt_last_error,
+            flush=True,
+        )
 
-        try:
-
-            print(
-                "Creating MQTT client for current worker...",
-                flush=True,
-            )
-
-            client = create_mqtt_client()
-
-            mqtt_client = client
-
-            print(
-                "Connecting MQTT worker to:",
-                MQTT_BROKER,
-                MQTT_PORT,
-                flush=True,
-            )
-
-            client.connect(
-                MQTT_BROKER,
-                MQTT_PORT,
-                60,
-            )
-
-            client.loop_start()
-
-            deadline = time.time() + 5
-
-            while time.time() < deadline:
-
-                try:
-
-                    if client.is_connected():
-
-                        mqtt_connected = True
-                        mqtt_last_error = ""
-
-                        print(
-                            "MQTT WORKER CONNECTED SUCCESSFULLY.",
-                            flush=True,
-                        )
-
-                        return True
-
-                except Exception:
-                    pass
-
-                time.sleep(0.1)
-
-            if client.is_connected():
-
-                mqtt_connected = True
-                mqtt_last_error = ""
-
-                return True
-
-            mqtt_connected = False
-
-            if not mqtt_last_error:
-
-                mqtt_last_error = (
-                    "MQTT connection did not complete."
-                )
-
-            print(
-                "MQTT WORKER CONNECTION TIMEOUT:",
-                mqtt_last_error,
-                flush=True,
-            )
-
-            return False
-
-        except Exception as exc:
-
-            mqtt_connected = False
-
-            mqtt_last_error = (
-                f"{type(exc).__name__}: {exc}"
-            )
-
-            print(
-                "MQTT WORKER CONNECTION ERROR:",
-                mqtt_last_error,
-                flush=True,
-            )
-
-            return False
+        return False
 
 
 # ============================================================
@@ -1089,12 +977,147 @@ def ensure_mqtt_connection():
 
 def start_mqtt():
 
+    global mqtt_client
+    global mqtt_connected
+    global mqtt_last_error
+
     print(
         "Starting MQTT background client",
         flush=True,
     )
 
-    ensure_mqtt_connection()
+    if not MQTT_BROKER:
+
+        mqtt_connected = False
+        mqtt_last_error = (
+            "MQTT_BROKER is empty."
+        )
+
+        print(
+            "MQTT START ERROR:",
+            mqtt_last_error,
+            flush=True,
+        )
+
+        return
+
+    if not MQTT_USERNAME:
+
+        mqtt_connected = False
+        mqtt_last_error = (
+            "MQTT_USERNAME is empty."
+        )
+
+        print(
+            "MQTT START ERROR:",
+            mqtt_last_error,
+            flush=True,
+        )
+
+        return
+
+    if not MQTT_PASSWORD:
+
+        mqtt_connected = False
+        mqtt_last_error = (
+            "MQTT_PASSWORD is empty."
+        )
+
+        print(
+            "MQTT START ERROR:",
+            mqtt_last_error,
+            flush=True,
+        )
+
+        return
+
+    try:
+
+        client = create_mqtt_client()
+
+        mqtt_client = client
+
+        print(
+            "Connecting MQTT to:",
+            MQTT_BROKER,
+            MQTT_PORT,
+            flush=True,
+        )
+
+        client.connect(
+            MQTT_BROKER,
+            MQTT_PORT,
+            60,
+        )
+
+        client.loop_start()
+
+        print(
+            "MQTT NETWORK LOOP STARTED.",
+            flush=True,
+        )
+
+        deadline = time.time() + 5
+
+        while time.time() < deadline:
+
+            try:
+
+                if client.is_connected():
+
+                    mqtt_connected = True
+                    mqtt_last_error = ""
+
+                    print(
+                        "MQTT CONNECTED SUCCESSFULLY.",
+                        flush=True,
+                    )
+
+                    return
+
+            except Exception:
+                pass
+
+            time.sleep(0.1)
+
+        mqtt_connected = client.is_connected()
+
+        if mqtt_connected:
+
+            mqtt_last_error = ""
+
+            print(
+                "MQTT CONNECTED AFTER WAIT.",
+                flush=True,
+            )
+
+        else:
+
+            if not mqtt_last_error:
+
+                mqtt_last_error = (
+                    "MQTT connection did not complete."
+                )
+
+            print(
+                "MQTT CONNECTION TIMEOUT:",
+                mqtt_last_error,
+                flush=True,
+            )
+
+    except Exception as exc:
+
+        mqtt_connected = False
+
+        mqtt_last_error = (
+            f"{type(exc).__name__}: {exc}"
+        )
+
+        print(
+            "MQTT START ERROR:",
+            mqtt_last_error,
+            flush=True,
+        )
 
 
 # ============================================================
@@ -1127,7 +1150,9 @@ def publish_device_command(
         return False
 
     # --------------------------------------------------------
-    # Make sure this Flask worker has a live MQTT connection.
+    # IMPORTANT:
+    # Use the SAME MQTT client created at startup.
+    # Do not create a new client for every button press.
     # --------------------------------------------------------
 
     connected = ensure_mqtt_connection()
@@ -1161,15 +1186,7 @@ def publish_device_command(
 
     try:
 
-        connected_now = client.is_connected()
-
-        print(
-            "MQTT CLIENT CONNECTED:",
-            connected_now,
-            flush=True,
-        )
-
-        if not connected_now:
+        if not client.is_connected():
 
             print(
                 "MQTT COMMAND BLOCKED: client disconnected",
@@ -1214,15 +1231,12 @@ def publish_device_command(
         )
 
         # ----------------------------------------------------
-        # KEEP QOS 0.
-        #
-        # This is the configuration previously proven to work
-        # with this HiveMQ broker and ESP32.
+        # PREVIOUSLY PROVEN WORKING FLASK -> HIVEMQ PATH
         # ----------------------------------------------------
 
         result = client.publish(
-            topic=topic,
-            payload=payload,
+            topic,
+            payload,
             qos=0,
             retain=False,
         )
@@ -1248,33 +1262,6 @@ def publish_device_command(
             )
 
             return False
-
-        # ----------------------------------------------------
-        # Give the Paho network loop time to process the
-        # outgoing QoS 0 packet.
-        #
-        # This does NOT change QoS.
-        # ----------------------------------------------------
-
-        try:
-
-            result.wait_for_publish(
-                timeout=3
-            )
-
-            print(
-                "MQTT PUBLISH WAIT COMPLETED",
-                flush=True,
-            )
-
-        except Exception as exc:
-
-            print(
-                "MQTT PUBLISH WAIT ERROR:",
-                type(exc).__name__,
-                str(exc),
-                flush=True,
-            )
 
         print(
             "MQTT COMMAND ACCEPTED BY PAHO.",
