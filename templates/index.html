@@ -1,586 +1,720 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
+
     <meta
         name="viewport"
-        content="width=device-width, initial-scale=1"
+        content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Dashboard | HomeIoT</title>
+    <title>Dashboard | Home IoT Secure</title>
 
     <link
         rel="stylesheet"
-        href="{{ url_for('static', filename='style.css') }}?v=30"
+        href="{{ url_for('static', filename='style.css') }}"
     >
 </head>
 
 <body>
 
-<button
-    class="mobile-menu"
-    onclick="toggleSidebar()"
-    aria-label="Open menu"
->
-    ☰
-</button>
+<div class="app-shell">
 
+    <!-- ======================================================
+         SIDEBAR
+         ====================================================== -->
 
-<!-- =========================================================
-     SIDEBAR
-========================================================= -->
+    <aside
+        class="sidebar"
+        id="sidebar"
+    >
 
-<aside
-    class="sidebar"
-    id="sidebar"
->
+        <div class="sidebar-brand">
 
-    <div class="brand">
+            <div class="brand-mark">
+                IoT
+            </div>
 
-        <div class="brand-icon">
-            ⌂
-        </div>
-
-        <div>
-            <h2>HomeIoT</h2>
-            <span>Remote Control</span>
-        </div>
-
-    </div>
-
-
-    <nav>
-
-        <a href="{{ url_for('home') }}">
-            🏠 &nbsp; Home
-        </a>
-
-        <a
-            href="{{ url_for('dashboard') }}"
-            class="active"
-        >
-            ▦ &nbsp; Dashboard
-        </a>
-
-        <a href="{{ url_for('devices') }}">
-            ◉ &nbsp; Devices
-        </a>
-
-        <a href="{{ url_for('history') }}">
-            ◷ &nbsp; History
-        </a>
-
-        <a href="{{ url_for('settings') }}">
-            ⚙ &nbsp; Settings
-        </a>
-
-        {% if current_user and current_user['role'] == 'ADMIN' %}
-
-        <a href="{{ url_for('admin_users') }}">
-            ♙ &nbsp; Admin
-        </a>
-
-        {% endif %}
-
-    </nav>
-
-
-    <div class="sidebar-footer">
-
-        <div class="sidebar-user">
-
-            <div class="connection-dot"></div>
-
-            <div>
-
-                <strong>
-                    {{ current_user['login_id'] }}
-                </strong>
-
-                <span>
-                    {{ current_user['role'] }}
-                    · Approved
-                </span>
-
+            <div class="brand-text">
+                <strong>Home IoT</strong>
+                <span>Secure Control</span>
             </div>
 
         </div>
 
 
-        <form
-            class="logout-form"
-            method="post"
-            action="{{ url_for('logout') }}"
-        >
+        <nav class="sidebar-nav">
 
-            <input
-                type="hidden"
-                name="csrf_token"
-                value="{{ csrf_token }}"
+            <a
+                href="{{ url_for('home') }}"
+                class="nav-item"
             >
-
-            <button type="submit">
-                ⇥ &nbsp; Logout
-            </button>
-
-        </form>
-
-    </div>
-
-</aside>
+                <span class="nav-icon">⌂</span>
+                <span>Home</span>
+            </a>
 
 
-<!-- =========================================================
-     MAIN
-========================================================= -->
-
-<main class="main">
-
-
-    <!-- =====================================================
-         HEADER
-    ====================================================== -->
-
-    <header class="topbar">
-
-        <div>
-
-            <p class="eyebrow">
-                REMOTE CONTROL
-            </p>
-
-            <h1>
-                Home Dashboard
-            </h1>
-
-            <p class="subtitle">
-                View the current status of your connected home.
-            </p>
-
-        </div>
+            <a
+                href="{{ url_for('dashboard') }}"
+                class="nav-item active"
+            >
+                <span class="nav-icon">▦</span>
+                <span>Dashboard</span>
+            </a>
 
 
-        <div
-            id="mqttBadge"
-            class="
-                badge
-                {% if mqtt_connected %}
-                    online
-                {% else %}
-                    offline
-                {% endif %}
-            "
-        >
+            <a
+                href="{{ url_for('devices') }}"
+                class="nav-item"
+            >
+                <span class="nav-icon">⚡</span>
+                <span>Devices</span>
+            </a>
 
-            {% if mqtt_connected %}
-                ● MQTT Connected
-            {% else %}
-                ● MQTT Offline
+
+            <a
+                href="{{ url_for('history') }}"
+                class="nav-item"
+            >
+                <span class="nav-icon">◷</span>
+                <span>History</span>
+            </a>
+
+
+            <a
+                href="{{ url_for('settings') }}"
+                class="nav-item"
+            >
+                <span class="nav-icon">⚙</span>
+                <span>Settings</span>
+            </a>
+
+
+            {% if current_user and current_user.role == "ADMIN" %}
+
+            <a
+                href="{{ url_for('admin_users') }}"
+                class="nav-item"
+            >
+                <span class="nav-icon">♙</span>
+                <span>User Management</span>
+            </a>
+
             {% endif %}
 
-        </div>
-
-    </header>
+        </nav>
 
 
-    <!-- =====================================================
-         ESP32 STATUS
-    ====================================================== -->
+        <div class="sidebar-bottom">
 
-    <section class="page-card">
+            <div class="sidebar-user">
 
-        <div class="section-heading">
+                <div class="user-avatar">
+                    {{ current_user.login_id[0]|upper }}
+                </div>
 
-            <div>
+                <div class="sidebar-user-info">
 
-                <p class="eyebrow">
-                    CONTROLLER STATUS
-                </p>
+                    <strong>
+                        {{ current_user.login_id }}
+                    </strong>
 
-                <h2>
-                    ESP32
-                </h2>
+                    <span>
+                        {{ current_user.role }}
+                    </span>
+
+                </div>
 
             </div>
 
-        </div>
 
+            <form
+                action="{{ url_for('logout') }}"
+                method="POST"
+            >
 
-        <div class="status-summary">
-
-            <div class="status-summary-item">
-
-                <span class="status-label">
-                    ESP32 Status
-                </span>
-
-                <strong
-                    id="esp32Status"
-                    class="
-                        esp-status
-                        {% if esp32 and esp32.online %}
-                            online
-                        {% else %}
-                            offline
-                        {% endif %}
-                    "
+                <input
+                    type="hidden"
+                    name="csrf_token"
+                    value="{{ csrf_token }}"
                 >
 
-                    {% if esp32 and esp32.online %}
-                        ● Online
-                    {% else %}
-                        ● Offline
-                    {% endif %}
+                <button
+                    type="submit"
+                    class="logout-button"
+                >
+                    Logout
+                </button>
 
-                </strong>
-
-            </div>
-
-
-            <div class="status-summary-item">
-
-                <span class="status-label">
-                    Last Seen
-                </span>
-
-                <strong id="esp32LastSeen">
-
-                    {% if esp32 and esp32.last_seen_display %}
-                        {{ esp32.last_seen_display }} IST
-                    {% else %}
-                        Never
-                    {% endif %}
-
-                </strong>
-
-            </div>
+            </form>
 
         </div>
 
-    </section>
+    </aside>
 
 
-    <!-- =====================================================
-         DEVICE STATUS
-    ====================================================== -->
+    <!-- ======================================================
+         MAIN CONTENT
+         ====================================================== -->
 
-    <h2 class="section-title">
-        Appliance Status
-    </h2>
+    <main class="main-content">
+
+        <!-- Top bar -->
+
+        <header class="topbar">
+
+            <button
+                type="button"
+                class="mobile-menu-button"
+                id="mobileMenuButton"
+                aria-label="Open menu"
+            >
+                ☰
+            </button>
 
 
-    <section class="devices">
+            <div class="topbar-title">
+
+                <span class="page-eyebrow">
+                    HOME IOT SECURE
+                </span>
+
+                <h1>
+                    Dashboard
+                </h1>
+
+            </div>
 
 
-        <!-- LIGHT -->
+            <div class="topbar-status">
 
-        <article class="card device-card">
+                <span
+                    class="system-status"
+                    data-mqtt-status
+                >
+                    {% if mqtt_connected %}
+                        <span class="status-dot online"></span>
+                        MQTT Connected
+                    {% else %}
+                        <span class="status-dot offline"></span>
+                        MQTT Disconnected
+                    {% endif %}
+                </span>
 
-            <div class="device-top">
+            </div>
 
-                <div class="icon">
-                    💡
-                </div>
+        </header>
 
-                <div class="device-info">
 
-                    <h3>
-                        Light
-                    </h3>
+        <!-- ==================================================
+             CONTENT
+             ================================================== -->
+
+        <section class="page-content">
+
+            <!-- Page introduction -->
+
+            <div class="page-intro">
+
+                <div>
+
+                    <h2>
+                        Home Overview
+                    </h2>
 
                     <p>
-                        Room lighting
+                        View the current status of your connected
+                        home appliances and sensors.
                     </p>
 
-                    <span
-                        id="lightState"
-                        class="
-                            state
-                            {% if device_state['light'] == 'ON' %}
-                                on
-                            {% else %}
-                                off
-                            {% endif %}
-                        "
-                    >
-                        {{ device_state['light'] }}
-                    </span>
+                </div>
 
+
+                <div class="view-only-badge">
+                    View Only
                 </div>
 
             </div>
 
-        </article>
 
+            <!-- ==================================================
+                 CONNECTION STATUS
+                 ================================================== -->
 
-        <!-- FAN -->
+            <section class="status-bar">
 
-        <article class="card device-card">
+                <div class="status-bar-item">
 
-            <div class="device-top">
-
-                <div class="icon">
-                    🌀
-                </div>
-
-                <div class="device-info">
-
-                    <h3>
-                        Fan
-                    </h3>
-
-                    <p>
-                        Cooling system
-                    </p>
-
-                    <span
-                        id="fanState"
-                        class="
-                            state
-                            {% if device_state['fan'] == 'ON' %}
-                                on
-                            {% else %}
-                                off
-                            {% endif %}
-                        "
-                    >
-                        {{ device_state['fan'] }}
+                    <span class="status-label">
+                        ESP32
                     </span>
 
-                </div>
-
-            </div>
-
-        </article>
-
-
-        <!-- GEYSER -->
-
-        <article class="card device-card">
-
-            <div class="device-top">
-
-                <div class="icon">
-                    ♨️
-                </div>
-
-                <div class="device-info">
-
-                    <h3>
-                        Geyser
-                    </h3>
-
-                    <p>
-                        Water heating
-                    </p>
-
                     <span
-                        id="geyserState"
-                        class="
-                            state
-                            {% if device_state['geyser'] == 'ON' %}
-                                on
-                            {% else %}
-                                off
-                            {% endif %}
-                        "
-                    >
-                        {{ device_state['geyser'] }}
-                    </span>
-
-                </div>
-
-            </div>
-
-        </article>
-
-
-    </section>
-
-
-    <!-- =====================================================
-         SENSOR READINGS
-    ====================================================== -->
-
-    <h2 class="section-title">
-        Current Readings
-    </h2>
-
-
-    <section class="devices">
-
-
-        <!-- TEMPERATURE -->
-
-        <article class="card">
-
-            <div class="device-top">
-
-                <div class="icon">
-                    🌡️
-                </div>
-
-                <div class="device-info">
-
-                    <h3>
-                        Temperature
-                    </h3>
-
-                    <p>
-                        Current room temperature
-                    </p>
-
-                    <strong
-                        id="temperature"
-                        class="reading-value"
+                        class="status-value"
+                        data-esp32-status
                     >
 
-                        {% if sensor_state['temperature'] is number %}
+                        {% if esp32.online %}
 
-                            {{ "%.1f"|format(
-                                sensor_state['temperature']
-                            ) }} °C
+                            <span class="status-dot online"></span>
+                            Online
 
                         {% else %}
 
-                            -- °C
+                            <span class="status-dot offline"></span>
+                            Offline
 
                         {% endif %}
 
-                    </strong>
+                    </span>
 
                 </div>
 
-            </div>
 
-        </article>
+                <div class="status-bar-item">
 
+                    <span class="status-label">
+                        Last Seen
+                    </span>
 
-        <!-- HUMIDITY -->
+                    <span
+                        class="status-value"
+                        data-esp32-last-seen
+                    >
+                        {{ esp32.last_seen }}
+                    </span>
 
-        <article class="card">
-
-            <div class="device-top">
-
-                <div class="icon">
-                    💧
                 </div>
 
-                <div class="device-info">
 
-                    <h3>
-                        Humidity
-                    </h3>
+                <div class="status-bar-item">
 
-                    <p>
-                        Current room humidity
-                    </p>
+                    <span class="status-label">
+                        MQTT
+                    </span>
 
-                    <strong
-                        id="humidity"
-                        class="reading-value"
+                    <span
+                        class="status-value"
+                        data-mqtt-status
                     >
 
-                        {% if sensor_state['humidity'] is number %}
+                        {% if mqtt_connected %}
 
-                            {{ "%.1f"|format(
-                                sensor_state['humidity']
-                            ) }} %
+                            <span class="status-dot online"></span>
+                            Connected
 
                         {% else %}
 
-                            -- %
+                            <span class="status-dot offline"></span>
+                            Disconnected
 
                         {% endif %}
 
-                    </strong>
+                    </span>
 
                 </div>
 
-            </div>
-
-        </article>
+            </section>
 
 
-        <!-- GAS -->
+            <!-- ==================================================
+                 DEVICES
+                 ================================================== -->
 
-        <article class="card">
+            <section class="dashboard-section">
 
-            <div class="device-top">
+                <div class="section-heading">
 
-                <div class="icon">
-                    🛡️
+                    <div>
+
+                        <span class="section-eyebrow">
+                            APPLIANCES
+                        </span>
+
+                        <h3>
+                            Current Device Status
+                        </h3>
+
+                    </div>
+
+                    <span class="section-note">
+                        Control available on Devices page
+                    </span>
+
                 </div>
 
-                <div class="device-info">
 
-                    <h3>
-                        Gas Status
-                    </h3>
+                <div class="device-grid">
+
+
+                    <!-- LIGHT -->
+
+                    <article class="device-card">
+
+                        <div class="device-card-header">
+
+                            <div class="device-icon light-icon">
+                                💡
+                            </div>
+
+                            <div class="device-card-title">
+
+                                <h4>
+                                    Light
+                                </h4>
+
+                                <span>
+                                    Living Area
+                                </span>
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="device-state-row">
+
+                            <span class="device-state-label">
+                                Status
+                            </span>
+
+                            <span
+                                class="device-state"
+                                data-device-status="light"
+                            >
+
+                                {% if status.devices.light == "ON" %}
+
+                                    <span class="status-dot online"></span>
+                                    ON
+
+                                {% else %}
+
+                                    <span class="status-dot offline"></span>
+                                    OFF
+
+                                {% endif %}
+
+                            </span>
+
+                        </div>
+
+                    </article>
+
+
+                    <!-- FAN -->
+
+                    <article class="device-card">
+
+                        <div class="device-card-header">
+
+                            <div class="device-icon fan-icon">
+                                🌀
+                            </div>
+
+                            <div class="device-card-title">
+
+                                <h4>
+                                    Fan
+                                </h4>
+
+                                <span>
+                                    Living Area
+                                </span>
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="device-state-row">
+
+                            <span class="device-state-label">
+                                Status
+                            </span>
+
+                            <span
+                                class="device-state"
+                                data-device-status="fan"
+                            >
+
+                                {% if status.devices.fan == "ON" %}
+
+                                    <span class="status-dot online"></span>
+                                    ON
+
+                                {% else %}
+
+                                    <span class="status-dot offline"></span>
+                                    OFF
+
+                                {% endif %}
+
+                            </span>
+
+                        </div>
+
+                    </article>
+
+
+                    <!-- GEYSER -->
+
+                    <article class="device-card">
+
+                        <div class="device-card-header">
+
+                            <div class="device-icon geyser-icon">
+                                ♨
+                            </div>
+
+                            <div class="device-card-title">
+
+                                <h4>
+                                    Geyser
+                                </h4>
+
+                                <span>
+                                    Bathroom
+                                </span>
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="device-state-row">
+
+                            <span class="device-state-label">
+                                Status
+                            </span>
+
+                            <span
+                                class="device-state"
+                                data-device-status="geyser"
+                            >
+
+                                {% if status.devices.geyser == "ON" %}
+
+                                    <span class="status-dot online"></span>
+                                    ON
+
+                                {% else %}
+
+                                    <span class="status-dot offline"></span>
+                                    OFF
+
+                                {% endif %}
+
+                            </span>
+
+                        </div>
+
+                    </article>
+
+
+                </div>
+
+            </section>
+
+
+            <!-- ==================================================
+                 SENSOR READINGS
+                 ================================================== -->
+
+            <section class="dashboard-section">
+
+                <div class="section-heading">
+
+                    <div>
+
+                        <span class="section-eyebrow">
+                            ESP32 SENSORS
+                        </span>
+
+                        <h3>
+                            Current Readings
+                        </h3>
+
+                    </div>
+
+                    <span class="section-note">
+                        Updated from ESP32 status messages
+                    </span>
+
+                </div>
+
+
+                <div class="sensor-grid">
+
+
+                    <!-- TEMPERATURE -->
+
+                    <article class="sensor-card">
+
+                        <div class="sensor-icon">
+                            🌡
+                        </div>
+
+                        <div class="sensor-content">
+
+                            <span class="sensor-label">
+                                Temperature
+                            </span>
+
+                            <strong
+                                class="sensor-value"
+                                id="temperature"
+                            >
+
+                                {% if status.sensors.temperature is not none %}
+                                    {{ status.sensors.temperature }} °C
+                                {% else %}
+                                    --
+                                {% endif %}
+
+                            </strong>
+
+                        </div>
+
+                    </article>
+
+
+                    <!-- HUMIDITY -->
+
+                    <article class="sensor-card">
+
+                        <div class="sensor-icon">
+                            💧
+                        </div>
+
+                        <div class="sensor-content">
+
+                            <span class="sensor-label">
+                                Humidity
+                            </span>
+
+                            <strong
+                                class="sensor-value"
+                                id="humidity"
+                            >
+
+                                {% if status.sensors.humidity is not none %}
+                                    {{ status.sensors.humidity }} %
+                                {% else %}
+                                    --
+                                {% endif %}
+
+                            </strong>
+
+                        </div>
+
+                    </article>
+
+
+                    <!-- GAS -->
+
+                    <article class="sensor-card">
+
+                        <div class="sensor-icon">
+                            ◉
+                        </div>
+
+                        <div class="sensor-content">
+
+                            <span class="sensor-label">
+                                Gas Status
+                            </span>
+
+                            <strong
+                                class="sensor-value"
+                                id="gas"
+                            >
+                                {{ status.sensors.gas or "UNKNOWN" }}
+                            </strong>
+
+                        </div>
+
+                    </article>
+
+
+                    <!-- GAS RAW -->
+
+                    <article class="sensor-card">
+
+                        <div class="sensor-icon">
+                            ≋
+                        </div>
+
+                        <div class="sensor-content">
+
+                            <span class="sensor-label">
+                                Gas Sensor Raw
+                            </span>
+
+                            <strong
+                                class="sensor-value"
+                                id="gasRaw"
+                            >
+
+                                {% if status.sensors.gas_raw is not none %}
+                                    {{ status.sensors.gas_raw }}
+                                {% else %}
+                                    --
+                                {% endif %}
+
+                            </strong>
+
+                        </div>
+
+                    </article>
+
+
+                </div>
+
+            </section>
+
+
+            <!-- ==================================================
+                 VIEW-ONLY NOTICE
+                 ================================================== -->
+
+            <section class="info-panel">
+
+                <div class="info-panel-icon">
+                    ℹ
+                </div>
+
+                <div>
+
+                    <h4>
+                        Dashboard is view-only
+                    </h4>
 
                     <p>
-                        MQ135 sensor status
+                        Appliance control is available only on
+                        the Devices page. This dashboard displays
+                        the latest state reported by the ESP32.
                     </p>
-
-                    <strong
-                        id="gas"
-                        class="reading-value"
-                    >
-                        {{ sensor_state['gas'] or 'UNKNOWN' }}
-                    </strong>
 
                 </div>
 
-            </div>
-
-        </article>
+            </section>
 
 
-    </section>
+        </section>
+
+    </main>
+
+</div>
 
 
-    <!-- =====================================================
-         VIEW-ONLY NOTICE
-    ====================================================== -->
-
-    <section class="page-card dashboard-notice">
-
-        <strong>
-            Dashboard is view-only
-        </strong>
-
-        <p>
-            To change the status of an appliance, open the
-            <a href="{{ url_for('devices') }}">
-                Devices
-            </a>
-            page.
-        </p>
-
-    </section>
-
-
-    <footer>
-        HomeIoT Remote Control • Flask + HiveMQ + ESP32
-    </footer>
-
-
-</main>
-
-
-<script>
-
-    window.CSRF_TOKEN =
-        {{ csrf_token|tojson }};
-
-</script>
-
+<!-- ==========================================================
+     JAVASCRIPT
+     ========================================================== -->
 
 <script
-    src="{{ url_for('static', filename='app.js') }}?v=30"
+    src="{{ url_for('static', filename='app.js') }}"
 ></script>
-
 
 </body>
 </html>
