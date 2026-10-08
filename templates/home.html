@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
 
     <meta
@@ -14,54 +16,44 @@
         rel="stylesheet"
         href="{{ url_for('static', filename='style.css') }}"
     >
+
 </head>
 
-<body class="landing-page">
+<body>
+
+<div class="landing-page">
 
     <!-- =====================================================
-         LANDING HEADER
+         NAVIGATION
          ===================================================== -->
 
-    <header class="landing-header">
+    <header class="landing-nav">
 
-        <div class="landing-brand">
-
-            <div class="brand-mark">
-                IoT
-            </div>
-
-            <div class="brand-text">
-
-                <strong>
-                    Home IoT
-                </strong>
-
-                <span>
-                    Secure Control
-                </span>
-
-            </div>
-
-        </div>
+        <a
+            href="{{ url_for('home') }}"
+            class="landing-nav-brand"
+        >
+            Home IoT
+        </a>
 
 
-        <nav class="landing-nav">
+        <div class="landing-nav-actions">
 
             <a
-                href="{{ url_for('signin') }}"
-                class="landing-signin"
+                href="{{ url_for('login') }}"
+                class="btn btn-secondary"
             >
                 Sign In
             </a>
 
             <a
                 href="{{ url_for('signup') }}"
-                class="primary-button landing-signup"
+                class="btn btn-primary"
             >
                 Create Account
             </a>
 
-        </nav>
+        </div>
 
     </header>
 
@@ -72,504 +64,38 @@
 
     <main>
 
-        <section class="landing-hero">
+        <section class="hero">
 
-            <div class="landing-hero-content">
+            <p class="page-eyebrow">
+                INTERNET-BASED HOME CONTROL
+            </p>
 
-                <span class="page-eyebrow">
-                    INTERNET-BASED HOME CONTROL
-                </span>
 
+            <h1>
+                Control your home appliances from anywhere.
+            </h1>
 
-                <h1>
-                    Control your home appliances
-                    <span>from anywhere.</span>
-                </h1>
 
+            <p>
+                A secure Flask-based IoT system for remotely
+                controlling household appliances through the
+                Internet using MQTT, HiveMQ Cloud and an ESP32
+                controller.
+            </p>
 
-                <p class="landing-hero-description">
-                    A secure Flask-based IoT system that lets
-                    authorized users remotely control connected
-                    home appliances through the Internet using
-                    MQTT and an ESP32.
-                </p>
 
-
-                <div class="landing-actions">
-
-                    <a
-                        href="{{ url_for('signin') }}"
-                        class="primary-button"
-                    >
-                        Sign In
-                    </a>
-
-                    <a
-                        href="{{ url_for('signup') }}"
-                        class="secondary-button"
-                    >
-                        Create Account
-                    </a>
-
-                </div>
-
-
-                <div class="landing-security-note">
-
-                    <span class="status-dot online"></span>
-
-                    Secure remote access with authenticated
-                    device control
-
-                </div>
-
-            </div>
-
-
-            <!-- =================================================
-                 HERO SYSTEM CARD
-                 ================================================= -->
-
-            <div class="landing-hero-visual">
-
-                <div class="system-card">
-
-                    <div class="system-card-header">
-
-                        <div>
-
-                            <span class="section-eyebrow">
-                                HOME IOT SYSTEM
-                            </span>
-
-                            <h3>
-                                Remote Control
-                            </h3>
-
-                        </div>
-
-                        <span class="system-live">
-                            <span class="status-dot online"></span>
-                            Connected System
-                        </span>
-
-                    </div>
-
-
-                    <!-- DEVICE STATUS -->
-
-                    <div class="system-device-list">
-
-
-                        <div class="system-device">
-
-                            <div class="system-device-icon">
-                                💡
-                            </div>
-
-                            <div class="system-device-info">
-
-                                <strong>
-                                    Light
-                                </strong>
-
-                                <span>
-                                    Remote appliance
-                                </span>
-
-                            </div>
-
-                            <span class="system-device-state">
-                                ON
-                            </span>
-
-                        </div>
-
-
-                        <div class="system-device">
-
-                            <div class="system-device-icon">
-                                🌀
-                            </div>
-
-                            <div class="system-device-info">
-
-                                <strong>
-                                    Fan
-                                </strong>
-
-                                <span>
-                                    Remote appliance
-                                </span>
-
-                            </div>
-
-                            <span class="system-device-state">
-                                OFF
-                            </span>
-
-                        </div>
-
-
-                        <div class="system-device">
-
-                            <div class="system-device-icon">
-                                ♨
-                            </div>
-
-                            <div class="system-device-info">
-
-                                <strong>
-                                    Geyser
-                                </strong>
-
-                                <span>
-                                    Remote appliance
-                                </span>
-
-                            </div>
-
-                            <span class="system-device-state">
-                                OFF
-                            </span>
-
-                        </div>
-
-
-                    </div>
-
-
-                    <!-- SENSOR PREVIEW -->
-
-                    <div class="system-sensor-row">
-
-                        <div>
-
-                            <span>
-                                Temperature
-                            </span>
-
-                            <strong>
-                                ESP32 Sensor
-                            </strong>
-
-                        </div>
-
-
-                        <div>
-
-                            <span>
-                                Humidity
-                            </span>
-
-                            <strong>
-                                DHT11
-                            </strong>
-
-                        </div>
-
-
-                        <div>
-
-                            <span>
-                                Gas
-                            </span>
-
-                            <strong>
-                                MQ-135
-                            </strong>
-
-                        </div>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-        </section>
-
-
-        <!-- =====================================================
-             ARCHITECTURE
-             ===================================================== -->
-
-        <section class="landing-section">
-
-            <div class="landing-section-heading">
-
-                <span class="page-eyebrow">
-                    SYSTEM ARCHITECTURE
-                </span>
-
-                <h2>
-                    Internet-connected appliance control
-                </h2>
-
-                <p>
-                    The system connects the user interface,
-                    cloud MQTT broker, and ESP32 controller
-                    to provide remote appliance control.
-                </p>
-
-            </div>
-
-
-            <div class="architecture-grid">
-
-
-                <!-- USER -->
-
-                <article class="architecture-card">
-
-                    <div class="architecture-number">
-                        01
-                    </div>
-
-                    <div class="architecture-icon">
-                        ◉
-                    </div>
-
-                    <h3>
-                        User
-                    </h3>
-
-                    <p>
-                        Access the web application from a
-                        mobile device or computer through
-                        the Internet.
-                    </p>
-
-                </article>
-
-
-                <!-- FLASK -->
-
-                <article class="architecture-card">
-
-                    <div class="architecture-number">
-                        02
-                    </div>
-
-                    <div class="architecture-icon">
-                        ◆
-                    </div>
-
-                    <h3>
-                        Flask Web App
-                    </h3>
-
-                    <p>
-                        Provides authentication, dashboard
-                        views, device controls, and history
-                        management.
-                    </p>
-
-                </article>
-
-
-                <!-- MQTT -->
-
-                <article class="architecture-card">
-
-                    <div class="architecture-number">
-                        03
-                    </div>
-
-                    <div class="architecture-icon">
-                        ≋
-                    </div>
-
-                    <h3>
-                        HiveMQ Cloud
-                    </h3>
-
-                    <p>
-                        Securely transports appliance commands
-                        and ESP32 status messages using MQTT.
-                    </p>
-
-                </article>
-
-
-                <!-- ESP32 -->
-
-                <article class="architecture-card">
-
-                    <div class="architecture-number">
-                        04
-                    </div>
-
-                    <div class="architecture-icon">
-                        ▣
-                    </div>
-
-                    <h3>
-                        ESP32
-                    </h3>
-
-                    <p>
-                        Receives appliance commands over Wi-Fi
-                        and controls the connected prototype
-                        devices through GPIO.
-                    </p>
-
-                </article>
-
-
-            </div>
-
-        </section>
-
-
-        <!-- =====================================================
-             FEATURES
-             ===================================================== -->
-
-        <section class="landing-section landing-features-section">
-
-            <div class="landing-section-heading">
-
-                <span class="page-eyebrow">
-                    FEATURES
-                </span>
-
-                <h2>
-                    Designed for secure remote control
-                </h2>
-
-            </div>
-
-
-            <div class="feature-grid">
-
-
-                <!-- AUTH -->
-
-                <article class="feature-card">
-
-                    <div class="feature-icon">
-                        ◉
-                    </div>
-
-                    <h3>
-                        Authentication
-                    </h3>
-
-                    <p>
-                        Email or phone-based sign in with
-                        hashed passwords and administrator
-                        approval for new accounts.
-                    </p>
-
-                </article>
-
-
-                <!-- REMOTE -->
-
-                <article class="feature-card">
-
-                    <div class="feature-icon">
-                        ⚡
-                    </div>
-
-                    <h3>
-                        Remote Appliance Control
-                    </h3>
-
-                    <p>
-                        Control the Light, Fan, and Geyser
-                        remotely through the secure MQTT
-                        communication path.
-                    </p>
-
-                </article>
-
-
-                <!-- MONITORING -->
-
-                <article class="feature-card">
-
-                    <div class="feature-icon">
-                        ◷
-                    </div>
-
-                    <h3>
-                        Status & History
-                    </h3>
-
-                    <p>
-                        View current ESP32 readings and review
-                        recorded device and account activity
-                        with IST timestamps.
-                    </p>
-
-                </article>
-
-
-                <!-- PERSISTENCE -->
-
-                <article class="feature-card">
-
-                    <div class="feature-icon">
-                        ◫
-                    </div>
-
-                    <h3>
-                        Persistent Storage
-                    </h3>
-
-                    <p>
-                        Firebase Firestore stores user,
-                        history, and latest ESP32 status data
-                        independently of the web server lifecycle.
-                    </p>
-
-                </article>
-
-
-            </div>
-
-        </section>
-
-
-        <!-- =====================================================
-             CALL TO ACTION
-             ===================================================== -->
-
-        <section class="landing-cta">
-
-            <div>
-
-                <span class="page-eyebrow">
-                    HOME IOT SECURE
-                </span>
-
-                <h2>
-                    Ready to access your IoT system?
-                </h2>
-
-                <p>
-                    Sign in to your existing account or
-                    create a new account for administrator
-                    approval.
-                </p>
-
-            </div>
-
-
-            <div class="landing-actions">
+            <div class="hero-actions">
 
                 <a
-                    href="{{ url_for('signin') }}"
-                    class="primary-button"
+                    href="{{ url_for('login') }}"
+                    class="btn btn-primary"
                 >
                     Sign In
                 </a>
 
                 <a
                     href="{{ url_for('signup') }}"
-                    class="secondary-button"
+                    class="btn btn-secondary"
                 >
                     Create Account
                 </a>
@@ -578,41 +104,127 @@
 
         </section>
 
+
+        <!-- =================================================
+             SYSTEM FEATURES
+             ================================================= -->
+
+        <section class="feature-grid">
+
+            <article class="feature-card">
+
+                <div class="feature-icon">
+                    ▦
+                </div>
+
+                <h3>
+                    Dashboard
+                </h3>
+
+                <p>
+                    View the current appliance states,
+                    ESP32 connectivity and live sensor
+                    readings.
+                </p>
+
+            </article>
+
+
+            <article class="feature-card">
+
+                <div class="feature-icon">
+                    ⚡
+                </div>
+
+                <h3>
+                    Remote Control
+                </h3>
+
+                <p>
+                    Send ON/OFF commands remotely to the
+                    Light, Fan and Geyser through MQTT.
+                </p>
+
+            </article>
+
+
+            <article class="feature-card">
+
+                <div class="feature-icon">
+                    ◷
+                </div>
+
+                <h3>
+                    History
+                </h3>
+
+                <p>
+                    Review appliance and account activity
+                    with timestamps displayed in IST.
+                </p>
+
+            </article>
+
+
+            <article class="feature-card">
+
+                <div class="feature-icon">
+                    ◉
+                </div>
+
+                <h3>
+                    ESP32 Status
+                </h3>
+
+                <p>
+                    See whether the ESP32 is actively
+                    reporting and view its latest status.
+                </p>
+
+            </article>
+
+
+            <article class="feature-card">
+
+                <div class="feature-icon">
+                    🔒
+                </div>
+
+                <h3>
+                    Secure Access
+                </h3>
+
+                <p>
+                    Passwords are securely hashed and new
+                    accounts require administrator approval.
+                </p>
+
+            </article>
+
+
+            <article class="feature-card">
+
+                <div class="feature-icon">
+                    ♙
+                </div>
+
+                <h3>
+                    Administration
+                </h3>
+
+                <p>
+                    Administrators can review and approve
+                    registered user accounts.
+                </p>
+
+            </article>
+
+        </section>
+
     </main>
 
-
-    <!-- =====================================================
-         FOOTER
-         ===================================================== -->
-
-    <footer class="landing-footer">
-
-        <div class="landing-footer-brand">
-
-            <div class="brand-mark">
-                IoT
-            </div>
-
-            <div>
-
-                <strong>
-                    Home IoT Secure
-                </strong>
-
-                <span>
-                    Internet-Based Remote Control of Home Appliances
-                </span>
-
-            </div>
-
-        </div>
-
-
-        <p>
-            Flask · MQTT · HiveMQ Cloud · ESP32 · Firebase Firestore
-        </p>
-
-    </footer>
+</div>
 
 </body>
+
 </html>
