@@ -1,472 +1,997 @@
-let state = {
-    devices: {
-        light: "OFF",
-        fan: "OFF",
-        geyser: "OFF"
+"use strict";
+
+/*
+ * ============================================================
+ * HomeIoT Frontend
+ * ============================================================
+ *
+ * Dashboard:
+ *   - View only
+ *   - Shows appliance states
+ *   - Shows sensor readings
+ *   - Shows MQTT status
+ *   - Shows actual ESP32 online/offline status
+ *
+ * Devices:
+ *   - Only page where appliance state can be changed
+ *   - One dynamic button per appliance
+ *
+ * MQTT:
+ *   - Backend handles MQTT communication
+ *   - Frontend only communicates with Flask API
+ * ============================================================
+ */
+
+
+const HomeIoT = {
+
+    state: {
+        devices: {
+            light: "OFF",
+            fan: "OFF",
+            geyser: "OFF"
+        },
+
+        sensors: {
+            temperature: null,
+            humidity: null,
+            gas: "--",
+            gas_raw: null
+        },
+
+        mqtt: {
+            connected: false
+        },
+
+        esp32: {
+            online: false,
+            last_seen: null
+        }
     },
 
-    sensors: {
-        temperature: null,
-        humidity: null,
-        gas: "UNKNOWN"
+
+    /*
+     * --------------------------------------------------------
+     * Utility
+     * --------------------------------------------------------
+     */
+
+    escapeHtml(value) {
+
+        if (value === null || value === undefined) {
+            return "";
+        }
+
+        return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+
     },
 
-    mqtt: {
-        connected: false
+
+    getElement(id) {
+
+        return document.getElementById(id);
+
+    },
+
+
+    setText(id, value) {
+
+        const element = this.getElement(id);
+
+        if (element) {
+            element.textContent = value;
+        }
+
+    },
+
+
+    /*
+     * --------------------------------------------------------
+     * Sidebar
+     * --------------------------------------------------------
+     */
+
+    toggleSidebar() {
+
+        const sidebar =
+            this.getElement("sidebar");
+
+        if (!sidebar) {
+            return;
+        }
+
+        sidebar.classList.toggle("open");
+
+    },
+
+
+    closeSidebarOnNavigation() {
+
+        const sidebar =
+            this.getElement("sidebar");
+
+        if (!sidebar) {
+            return;
+        }
+
+        if (window.innerWidth <= 900) {
+            sidebar.classList.remove("open");
+        }
+
+    },
+
+
+    /*
+     * --------------------------------------------------------
+     * CSRF
+     * --------------------------------------------------------
+     */
+
+    getCsrfToken() {
+
+        const element =
+            document.querySelector(
+                'input[name="csrf_token"]'
+            );
+
+        if (element) {
+            return element.value;
+        }
+
+
+        const meta =
+            document.querySelector(
+                'meta[name="csrf-token"]'
+            );
+
+        if (meta) {
+            return meta.getAttribute("content");
+        }
+
+
+        return "";
+
+    },
+
+
+    /*
+     * --------------------------------------------------------
+     * API
+     * --------------------------------------------------------
+     */
+
+    async getStatus() {
+
+        try {
+
+            const response =
+                await fetch(
+                    "/api/status",
+                    {
+                        method: "GET",
+                        headers: {
+                            "Accept": "application/json"
+                        },
+                        cache: "no-store"
+                    }
+                );
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    "Status request failed"
+                );
+
+            }
+
+
+            const data =
+                await response.json();
+
+
+            this.updateState(data);
+
+            this.updateDashboard();
+
+            this.updateDevices();
+
+            this.updateConnectionIndicators();
+
+        } catch (error) {
+
+            console.error(
+                "HomeIoT status error:",
+                error
+            );
+
+        }
+
+    },
+
+
+    async sendDeviceCommand(
+        device,
+        action,
+        button
+    ) {
+
+        if (!device || !action) {
+            return;
+        }
+
+
+        if (button) {
+
+            button.disabled = true;
+
+            button.dataset.originalText =
+                button.textContent;
+
+            button.textContent =
+                "Sending...";
+
+        }
+
+
+        try {
+
+            const csrfToken =
+                this.getCsrfToken();
+
+
+            const response =
+                await fetch(
+                    `/api/device/${encodeURIComponent(device)}/${encodeURIComponent(action)}`,
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json",
+
+                            "Accept":
+                                "application/json",
+
+                            "X-CSRF-Token":
+                                csrfToken
+                        },
+
+                        body: JSON.stringify({})
+                    }
+                );
+
+
+            let data = {};
+
+            try {
+                data = await response.json();
+            } catch (_) {
+                data = {};
+            }
+
+
+            if (!response.ok) {
+
+                throw new Error(
+                    data.error ||
+                    data.message ||
+                    "Unable to send command"
+                );
+
+            }
+
+
+            /*
+             * Do not permanently change the device state here.
+             *
+             * The actual state is refreshed from /api/status.
+             * This prevents the UI from claiming that the ESP32
+             * changed state when only the MQTT command was sent.
+             */
+
+            this.showCommandMessage(
+                data.message ||
+                "Command sent successfully.",
+                "success"
+            );
+
+
+            /*
+             * Give the ESP32 a short opportunity to process
+             * the MQTT command and publish its status.
+             */
+
+            setTimeout(
+                () => this.getStatus(),
+                700
+            );
+
+
+            setTimeout(
+                () => this.getStatus(),
+                1800
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                "Device command error:",
+                error
+            );
+
+
+            this.showCommandMessage(
+                error.message ||
+                "Command failed.",
+                "error"
+            );
+
+        } finally {
+
+            if (button) {
+
+                setTimeout(
+                    () => {
+
+                        button.disabled = false;
+
+                        const currentState =
+                            this.state.devices[
+                                device
+                            ] || "OFF";
+
+
+                        button.textContent =
+                            currentState === "ON"
+                                ? "Turn OFF"
+                                : "Turn ON";
+
+                    },
+                    1200
+                );
+
+            }
+
+        }
+
+    },
+
+
+    /*
+     * --------------------------------------------------------
+     * State
+     * --------------------------------------------------------
+     */
+
+    updateState(data) {
+
+        if (!data || typeof data !== "object") {
+            return;
+        }
+
+
+        if (data.devices) {
+
+            this.state.devices = {
+                ...this.state.devices,
+                ...data.devices
+            };
+
+        }
+
+
+        if (data.sensors) {
+
+            this.state.sensors = {
+                ...this.state.sensors,
+                ...data.sensors
+            };
+
+        }
+
+
+        this.state.mqtt.connected =
+            data.mqtt_connected === true;
+
+
+        if (data.esp32) {
+
+            this.state.esp32 = {
+                ...this.state.esp32,
+                ...data.esp32
+            };
+
+        }
+
+    },
+
+
+    /*
+     * --------------------------------------------------------
+     * Dashboard
+     * --------------------------------------------------------
+     */
+
+    updateDashboard() {
+
+        this.updateDeviceStatus(
+            "light",
+            this.state.devices.light
+        );
+
+        this.updateDeviceStatus(
+            "fan",
+            this.state.devices.fan
+        );
+
+        this.updateDeviceStatus(
+            "geyser",
+            this.state.devices.geyser
+        );
+
+
+        const sensors =
+            this.state.sensors;
+
+
+        /*
+         * Temperature
+         */
+
+        if (
+            sensors.temperature !== null &&
+            sensors.temperature !== undefined
+        ) {
+
+            this.setText(
+                "temperature",
+                `${sensors.temperature} °C`
+            );
+
+        } else {
+
+            this.setText(
+                "temperature",
+                "--"
+            );
+
+        }
+
+
+        /*
+         * Humidity
+         */
+
+        if (
+            sensors.humidity !== null &&
+            sensors.humidity !== undefined
+        ) {
+
+            this.setText(
+                "humidity",
+                `${sensors.humidity} %`
+            );
+
+        } else {
+
+            this.setText(
+                "humidity",
+                "--"
+            );
+
+        }
+
+
+        /*
+         * Gas
+         */
+
+        this.setText(
+            "gas",
+            sensors.gas || "--"
+        );
+
+
+        /*
+         * Raw gas value, if displayed.
+         */
+
+        if (
+            sensors.gas_raw !== null &&
+            sensors.gas_raw !== undefined
+        ) {
+
+            this.setText(
+                "gasRaw",
+                sensors.gas_raw
+            );
+
+        }
+
+    },
+
+
+    /*
+     * --------------------------------------------------------
+     * Device state display
+     * --------------------------------------------------------
+     */
+
+    updateDeviceStatus(
+        device,
+        status
+    ) {
+
+        const normalized =
+            String(status || "OFF")
+                .toUpperCase();
+
+
+        const elements =
+            document.querySelectorAll(
+                `[data-device-status="${device}"]`
+            );
+
+
+        elements.forEach(
+            element => {
+
+                element.textContent =
+                    normalized;
+
+                element.classList.remove(
+                    "on",
+                    "off"
+                );
+
+
+                if (normalized === "ON") {
+
+                    element.classList.add("on");
+
+                } else {
+
+                    element.classList.add("off");
+
+                }
+
+            }
+        );
+
+    },
+
+
+    /*
+     * --------------------------------------------------------
+     * Devices page
+     * --------------------------------------------------------
+     */
+
+    updateDevices() {
+
+        const devices =
+            [
+                "light",
+                "fan",
+                "geyser"
+            ];
+
+
+        devices.forEach(
+            device => {
+
+                const state =
+                    String(
+                        this.state.devices[device] ||
+                        "OFF"
+                    ).toUpperCase();
+
+
+                /*
+                 * Device status labels
+                 */
+
+                this.updateDeviceStatus(
+                    device,
+                    state
+                );
+
+
+                /*
+                 * Exactly one button per device.
+                 *
+                 * OFF -> Turn ON
+                 * ON  -> Turn OFF
+                 */
+
+                const button =
+                    this.getElement(
+                        `${device}Button`
+                    );
+
+
+                if (!button) {
+                    return;
+                }
+
+
+                button.textContent =
+                    state === "ON"
+                        ? "Turn OFF"
+                        : "Turn ON";
+
+
+                button.classList.remove(
+                    "is-on",
+                    "is-off"
+                );
+
+
+                if (state === "ON") {
+
+                    button.classList.add(
+                        "is-on"
+                    );
+
+                } else {
+
+                    button.classList.add(
+                        "is-off"
+                    );
+
+                }
+
+
+                button.dataset.state =
+                    state;
+
+            }
+        );
+
+    },
+
+
+    /*
+     * --------------------------------------------------------
+     * Dynamic device toggle
+     * --------------------------------------------------------
+     */
+
+    toggleDevice(device) {
+
+        if (
+            ![
+                "light",
+                "fan",
+                "geyser"
+            ].includes(device)
+        ) {
+
+            console.error(
+                "Invalid device:",
+                device
+            );
+
+            return;
+
+        }
+
+
+        const currentState =
+            String(
+                this.state.devices[device] ||
+                "OFF"
+            ).toUpperCase();
+
+
+        const action =
+            currentState === "ON"
+                ? "OFF"
+                : "ON";
+
+
+        const button =
+            this.getElement(
+                `${device}Button`
+            );
+
+
+        this.sendDeviceCommand(
+            device,
+            action,
+            button
+        );
+
+    },
+
+
+    /*
+     * --------------------------------------------------------
+     * MQTT / ESP32 indicators
+     * --------------------------------------------------------
+     */
+
+    updateConnectionIndicators() {
+
+        const mqttConnected =
+            this.state.mqtt.connected;
+
+
+        /*
+         * MQTT status
+         */
+
+        const mqttElements =
+            document.querySelectorAll(
+                "[data-mqtt-status]"
+            );
+
+
+        mqttElements.forEach(
+            element => {
+
+                element.textContent =
+                    mqttConnected
+                        ? "Connected"
+                        : "Disconnected";
+
+
+                element.classList.remove(
+                    "connected",
+                    "disconnected"
+                );
+
+
+                element.classList.add(
+                    mqttConnected
+                        ? "connected"
+                        : "disconnected"
+                );
+
+            }
+        );
+
+
+        /*
+         * ESP32 status
+         */
+
+        const esp32Online =
+            this.state.esp32.online === true;
+
+
+        const espElements =
+            document.querySelectorAll(
+                "[data-esp32-status]"
+            );
+
+
+        espElements.forEach(
+            element => {
+
+                element.textContent =
+                    esp32Online
+                        ? "Online"
+                        : "Offline";
+
+
+                element.classList.remove(
+                    "online",
+                    "offline"
+                );
+
+
+                element.classList.add(
+                    esp32Online
+                        ? "online"
+                        : "offline"
+                );
+
+            }
+        );
+
+
+        /*
+         * Last Seen
+         */
+
+        const lastSeen =
+            this.state.esp32.last_seen;
+
+
+        const lastSeenElements =
+            document.querySelectorAll(
+                "[data-esp32-last-seen]"
+            );
+
+
+        lastSeenElements.forEach(
+            element => {
+
+                element.textContent =
+                    lastSeen || "Never";
+
+            }
+        );
+
+    },
+
+
+    /*
+     * --------------------------------------------------------
+     * Command message
+     * --------------------------------------------------------
+     */
+
+    showCommandMessage(
+        message,
+        type = "success"
+    ) {
+
+        let container =
+            this.getElement(
+                "commandMessage"
+            );
+
+
+        if (!container) {
+
+            container =
+                document.createElement("div");
+
+            container.id =
+                "commandMessage";
+
+            container.className =
+                "command-message";
+
+
+            document.body.appendChild(
+                container
+            );
+
+        }
+
+
+        container.textContent =
+            message;
+
+
+        container.classList.remove(
+            "success",
+            "error"
+        );
+
+
+        container.classList.add(
+            type
+        );
+
+
+        container.classList.add(
+            "visible"
+        );
+
+
+        clearTimeout(
+            this.commandMessageTimer
+        );
+
+
+        this.commandMessageTimer =
+            setTimeout(
+                () => {
+
+                    container.classList.remove(
+                        "visible"
+                    );
+
+                },
+                3500
+            );
+
+    },
+
+
+    /*
+     * --------------------------------------------------------
+     * Automatic status refresh
+     * --------------------------------------------------------
+     */
+
+    startPolling() {
+
+        /*
+         * Initial request.
+         */
+
+        this.getStatus();
+
+
+        /*
+         * Refresh every 5 seconds.
+         *
+         * This is only for displaying current state.
+         * Appliance automation is NOT performed here.
+         */
+
+        this.pollingTimer =
+            setInterval(
+                () => this.getStatus(),
+                5000
+            );
+
+    },
+
+
+    /*
+     * --------------------------------------------------------
+     * Initialization
+     * --------------------------------------------------------
+     */
+
+    init() {
+
+        /*
+         * Make sidebar available globally through the
+         * existing onclick="toggleSidebar()" calls.
+         */
+
+        window.toggleSidebar =
+            () => this.toggleSidebar();
+
+
+        /*
+         * Make device toggle available to the Devices page.
+         */
+
+        window.toggleDevice =
+            device => this.toggleDevice(device);
+
+
+        /*
+         * Close mobile sidebar after navigation.
+         */
+
+        document
+            .querySelectorAll(".sidebar a")
+            .forEach(
+                link => {
+
+                    link.addEventListener(
+                        "click",
+                        () => this.closeSidebarOnNavigation()
+                    );
+
+                }
+            );
+
+
+        /*
+         * Start status updates.
+         */
+
+        this.startPolling();
+
     }
+
 };
 
 
-function toggleSidebar() {
-
-    const sidebar =
-        document.getElementById("sidebar");
-
-    if (sidebar) {
-        sidebar.classList.toggle("open");
-    }
-}
-
-
-function updateMQTT() {
-
-    const connected =
-        state.mqtt.connected === true;
-
-    const badge =
-        document.getElementById("mqttBadge");
-
-    const text =
-        document.getElementById("mqttText");
-
-    if (badge) {
-
-        badge.textContent = connected
-            ? "● MQTT Connected"
-            : "● MQTT Offline";
-
-        badge.classList.remove(
-            "offline",
-            "online"
-        );
-
-        badge.classList.add(
-            connected
-                ? "online"
-                : "offline"
-        );
-    }
-
-    if (text) {
-
-        text.textContent = connected
-            ? "Connected"
-            : "Offline";
-    }
-}
-
-
-function updateTemperature() {
-
-    const element =
-        document.getElementById(
-            "temperature"
-        );
-
-    if (!element) {
-        return;
-    }
-
-    const value =
-        Number(
-            state.sensors.temperature
-        );
-
-    if (Number.isFinite(value)) {
-
-        element.textContent =
-            value.toFixed(1) +
-            " °C";
-
-    } else {
-
-        element.textContent =
-            "-- °C";
-    }
-}
-
-
-function updateHumidity() {
-
-    const element =
-        document.getElementById(
-            "humidity"
-        );
-
-    if (!element) {
-        return;
-    }
-
-    const value =
-        Number(
-            state.sensors.humidity
-        );
-
-    if (Number.isFinite(value)) {
-
-        element.textContent =
-            value.toFixed(1) +
-            " %";
-
-    } else {
-
-        element.textContent =
-            "-- %";
-    }
-}
-
-
-function updateGas() {
-
-    const element =
-        document.getElementById("gas");
-
-    if (!element) {
-        return;
-    }
-
-    element.textContent =
-        state.sensors.gas ||
-        "UNKNOWN";
-}
-
-
-function updateDevice(
-    device,
-    status
-) {
-
-    const value =
-        String(
-            status || "OFF"
-        ).toUpperCase();
-
-    const element =
-        document.getElementById(
-            device + "State"
-        );
-
-    if (!element) {
-        return;
-    }
-
-    element.textContent =
-        value;
-
-    element.classList.remove(
-        "on",
-        "off"
-    );
-
-    element.classList.add(
-        value === "ON"
-            ? "on"
-            : "off"
-    );
-}
-
-
-async function refreshStatus() {
-
-    try {
-
-        const response =
-            await fetch(
-                "/api/status?t=" +
-                Date.now(),
-                {
-                    cache: "no-store",
-
-                    headers: {
-                        "Cache-Control":
-                            "no-cache",
-
-                        "Pragma":
-                            "no-cache"
-                    }
-                }
-            );
-
-        if (
-            response.status === 401 ||
-            response.redirected
-        ) {
-
-            window.location.href =
-                "/login";
-
-            return;
-        }
-
-        if (!response.ok) {
-
-            throw new Error(
-                "Status request failed"
-            );
-        }
-
-        const data =
-            await response.json();
-
-        state = {
-
-            devices:
-                data.devices || {},
-
-            sensors:
-                data.sensors || {},
-
-            mqtt: {
-                connected:
-                    data.mqtt_connected === true
-            }
-        };
-
-        updateMQTT();
-
-        updateTemperature();
-
-        updateHumidity();
-
-        updateGas();
-
-        updateDevice(
-            "light",
-            state.devices.light
-        );
-
-        updateDevice(
-            "fan",
-            state.devices.fan
-        );
-
-        updateDevice(
-            "geyser",
-            state.devices.geyser
-        );
-
-    } catch (error) {
-
-        console.error(
-            "STATUS ERROR:",
-            error
-        );
-    }
-}
-
-
-async function controlDevice(
-    device,
-    action
-) {
-
-    const message =
-        document.getElementById(
-            "message"
-        );
-
-    if (message) {
-
-        message.textContent =
-            "Sending command...";
-
-        message.className =
-            "message sending";
-    }
-
-    try {
-
-        const response =
-            await fetch(
-                "/api/device/" +
-                encodeURIComponent(
-                    device
-                ) +
-                "/" +
-                encodeURIComponent(
-                    action
-                ),
-                {
-                    method: "POST",
-
-                    cache: "no-store",
-
-                    headers: {
-
-                        "Cache-Control":
-                            "no-cache",
-
-                        "Pragma":
-                            "no-cache",
-
-                        "X-CSRF-Token":
-                            window.CSRF_TOKEN ||
-                            ""
-                    }
-                }
-            );
-
-        if (
-            response.status === 401 ||
-            response.status === 302
-        ) {
-
-            window.location.href =
-                "/login";
-
-            return;
-        }
-
-        const result =
-            await response.json();
-
-        if (!response.ok) {
-
-            throw new Error(
-                result.error ||
-                "Command failed"
-            );
-        }
-
-        if (result.success !== true) {
-
-            throw new Error(
-                result.error ||
-                "MQTT command could not be sent."
-            );
-        }
-
-        state.devices[device] =
-            action.toUpperCase();
-
-        updateDevice(
-            device,
-            state.devices[device]
-        );
-
-        if (message) {
-
-            message.textContent =
-                device +
-                " turned " +
-                action.toUpperCase() +
-                " successfully.";
-
-            message.className =
-                "message success";
-        }
-
-        setTimeout(
-            refreshStatus,
-            1000
-        );
-
-    } catch (error) {
-
-        console.error(
-            "CONTROL ERROR:",
-            error
-        );
-
-        if (message) {
-
-            message.textContent =
-                error.message ||
-                "Command failed.";
-
-            message.className =
-                "message error";
-        }
-
-        refreshStatus();
-    }
-}
-
-
 /*
- * Compatibility for the old Dashboard anchors.
- *
- * Older pages contain:
- *     href="#devices"
- *     href="#monitoring"
- *
- * They now open the dedicated pages.
+ * ============================================================
+ * START APPLICATION
+ * ============================================================
  */
 
 document.addEventListener(
-    "click",
-    function (event) {
-
-        const link =
-            event.target.closest(
-                ".sidebar a"
-            );
-
-        if (!link) {
-            return;
-        }
-
-        const href =
-            link.getAttribute(
-                "href"
-            );
-
-        if (href === "#devices") {
-
-            event.preventDefault();
-
-            window.location.href =
-                "/devices";
-
-            return;
-        }
-
-        if (
-            href === "#monitoring"
-        ) {
-
-            event.preventDefault();
-
-            window.location.href =
-                "/monitoring";
-
-            return;
-        }
-
-        if (
-            window.innerWidth <= 720
-        ) {
-
-            const sidebar =
-                document.getElementById(
-                    "sidebar"
-                );
-
-            if (sidebar) {
-
-                sidebar.classList.remove(
-                    "open"
-                );
-            }
-        }
-    }
-);
-
-
-refreshStatus();
-
-
-setInterval(
-    refreshStatus,
-    5000
+    "DOMContentLoaded",
+    () => HomeIoT.init()
 );
