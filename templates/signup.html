@@ -1,19 +1,18 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
 
     <meta
         name="viewport"
-        content="width=device-width, initial-scale=1"
+        content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Sign Up | HomeIoT</title>
+    <title>Create Account | Home IoT Secure</title>
 
     <link
         rel="stylesheet"
-        href="{{ url_for('static', filename='style.css') }}?v=33"
+        href="{{ url_for('static', filename='style.css') }}"
     >
 </head>
 
@@ -25,23 +24,23 @@
 
             <!-- =================================================
                  BRAND
-            ================================================== -->
+                 ================================================= -->
 
             <div class="auth-brand">
 
-                <div class="brand-icon">
-                    ⌂
+                <div class="brand-mark">
+                    IoT
                 </div>
 
                 <div>
 
-                    <h1>
-                        HomeIoT
-                    </h1>
+                    <strong>
+                        Home IoT
+                    </strong>
 
-                    <p>
-                        Remote Control
-                    </p>
+                    <span>
+                        Secure Control
+                    </span>
 
                 </div>
 
@@ -49,22 +48,22 @@
 
 
             <!-- =================================================
-                 TITLE
-            ================================================== -->
+                 HEADER
+                 ================================================= -->
 
-            <div class="auth-heading">
+            <div class="auth-header">
 
-                <p class="eyebrow">
-                    CREATE ACCOUNT
-                </p>
+                <span class="page-eyebrow">
+                    HOME IOT SECURE
+                </span>
 
-                <h2>
-                    Sign Up
-                </h2>
+                <h1>
+                    Create Account
+                </h1>
 
                 <p>
-                    Create your HomeIoT account to access the
-                    remote-control system.
+                    Register with your email address or phone
+                    number to request access to the IoT system.
                 </p>
 
             </div>
@@ -72,9 +71,11 @@
 
             <!-- =================================================
                  FLASH MESSAGES
-            ================================================== -->
+                 ================================================= -->
 
-            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% with messages = get_flashed_messages(
+                with_categories=true
+            ) %}
 
                 {% if messages %}
 
@@ -83,7 +84,12 @@
                         {% for category, message in messages %}
 
                             <div
-                                class="flash-message {{ category }}"
+                                class="flash-message
+                                {% if category == 'error' %}
+                                    flash-error
+                                {% else %}
+                                    flash-success
+                                {% endif %}"
                             >
                                 {{ message }}
                             </div>
@@ -99,24 +105,18 @@
 
             <!-- =================================================
                  SIGNUP FORM
-            ================================================== -->
+                 ================================================= -->
 
             <form
-                method="post"
                 action="{{ url_for('signup') }}"
+                method="POST"
                 class="auth-form"
+                id="signupForm"
             >
 
-                <input
-                    type="hidden"
-                    name="csrf_token"
-                    value="{{ csrf_token }}"
-                >
+                <!-- LOGIN ID -->
 
-
-                <!-- Email / Phone -->
-
-                <div class="form-group">
+                <div class="form-field">
 
                     <label for="login_id">
                         Email or Phone Number
@@ -132,17 +132,16 @@
                         autofocus
                     >
 
-                    <small>
-                        Use the same email or phone number when
-                        signing in.
-                    </small>
+                    <span class="form-help">
+                        This will be used to sign in to your account.
+                    </span>
 
                 </div>
 
 
-                <!-- Password -->
+                <!-- PASSWORD -->
 
-                <div class="form-group">
+                <div class="form-field">
 
                     <label for="password">
                         Password
@@ -152,22 +151,22 @@
                         type="password"
                         id="password"
                         name="password"
-                        placeholder="Create a password"
+                        placeholder="Enter your password"
                         autocomplete="new-password"
                         minlength="8"
                         required
                     >
 
-                    <small>
+                    <span class="form-help">
                         Password must contain at least 8 characters.
-                    </small>
+                    </span>
 
                 </div>
 
 
-                <!-- Confirm Password -->
+                <!-- CONFIRM PASSWORD -->
 
-                <div class="form-group">
+                <div class="form-field">
 
                     <label for="confirm_password">
                         Confirm Password
@@ -183,8 +182,16 @@
                         required
                     >
 
+                    <span
+                        class="form-help"
+                        id="passwordMatchMessage"
+                    >
+                    </span>
+
                 </div>
 
+
+                <!-- SUBMIT -->
 
                 <button
                     type="submit"
@@ -197,97 +204,163 @@
 
 
             <!-- =================================================
-                 APPROVAL INFORMATION
-            ================================================== -->
+                 APPROVAL NOTICE
+                 ================================================= -->
 
             <div class="auth-notice">
 
-                <strong>
-                    Administrator approval required
-                </strong>
+                <div class="auth-notice-icon">
+                    ℹ
+                </div>
 
-                <p>
-                    Your account will remain pending until an
-                    administrator approves it.
-                </p>
+                <div>
+
+                    <strong>
+                        Administrator approval required
+                    </strong>
+
+                    <p>
+                        After registration, your account will remain
+                        pending until an administrator approves it.
+                    </p>
+
+                </div>
 
             </div>
 
 
             <!-- =================================================
-                 SIGN IN
-            ================================================== -->
+                 FOOTER
+                 ================================================= -->
 
             <div class="auth-footer">
 
-                <p>
+                <span>
                     Already have an account?
-                </p>
+                </span>
 
-                <a href="{{ url_for('signin') }}">
-                    Sign in
+                <a
+                    href="{{ url_for('signin') }}"
+                >
+                    Sign In
+                </a>
+
+            </div>
+
+
+            <div class="auth-home-link">
+
+                <a
+                    href="{{ url_for('home') }}"
+                >
+                    ← Back to Home
                 </a>
 
             </div>
 
         </section>
 
-
-        <footer class="auth-page-footer">
-
-            HomeIoT Remote Control • Flask + HiveMQ + ESP32
-
-        </footer>
-
     </main>
 
 
-    <!-- =====================================================
-         CLIENT-SIDE PASSWORD CHECK
-    ====================================================== -->
+    <!-- =========================================================
+         PASSWORD MATCH VALIDATION
+         ========================================================= -->
 
     <script>
 
-        const signupForm =
-            document.querySelector(".auth-form");
+    document.addEventListener(
+        "DOMContentLoaded",
+        function () {
 
-        if (signupForm) {
+            const form =
+                document.getElementById(
+                    "signupForm"
+                );
 
-            signupForm.addEventListener(
+            const password =
+                document.getElementById(
+                    "password"
+                );
+
+            const confirmPassword =
+                document.getElementById(
+                    "confirm_password"
+                );
+
+            const message =
+                document.getElementById(
+                    "passwordMatchMessage"
+                );
+
+
+            function validatePasswords() {
+
+                if (
+                    !confirmPassword.value
+                ) {
+
+                    message.textContent = "";
+
+                    confirmPassword.setCustomValidity(
+                        ""
+                    );
+
+                    return;
+
+                }
+
+
+                if (
+                    password.value !==
+                    confirmPassword.value
+                ) {
+
+                    message.textContent =
+                        "Passwords do not match.";
+
+                    confirmPassword.setCustomValidity(
+                        "Passwords do not match."
+                    );
+
+                } else {
+
+                    message.textContent =
+                        "Passwords match.";
+
+                    confirmPassword.setCustomValidity(
+                        ""
+                    );
+
+                }
+
+            }
+
+
+            password.addEventListener(
+                "input",
+                validatePasswords
+            );
+
+
+            confirmPassword.addEventListener(
+                "input",
+                validatePasswords
+            );
+
+
+            form.addEventListener(
                 "submit",
-                function(event) {
+                function (event) {
 
-                    const password =
-                        document.getElementById(
-                            "password"
-                        ).value;
-
-                    const confirmPassword =
-                        document.getElementById(
-                            "confirm_password"
-                        ).value;
+                    validatePasswords();
 
 
-                    if (password !== confirmPassword) {
+                    if (
+                        !form.checkValidity()
+                    ) {
 
                         event.preventDefault();
-
-                        alert(
-                            "Passwords do not match."
-                        );
-
-                        return;
-
-                    }
-
-
-                    if (password.length < 8) {
-
-                        event.preventDefault();
-
-                        alert(
-                            "Password must contain at least 8 characters."
-                        );
 
                     }
 
@@ -295,9 +368,9 @@
             );
 
         }
+    );
 
     </script>
-
 
 </body>
 </html>
