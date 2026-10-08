@@ -1,11 +1,11 @@
 import os
 import json
-import re
-import threading
 import time
 import secrets
 from datetime import datetime, timezone, timedelta
 from functools import wraps
+
+import paho.mqtt.client as mqtt
 
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -17,46 +17,84 @@ from flask import (
     redirect,
     url_for,
     session,
-    jsonify,
     flash,
+    jsonify,
 )
-
-from werkzeug.security import (
-    generate_password_hash,
-    check_password_hash,
-)
-
-import paho.mqtt.client as mqtt
 
 
 # ============================================================
-# FLASK
+# APP CONFIGURATION
 # ============================================================
 
 app = Flask(__name__)
 
 app.secret_key = os.environ.get(
     "SECRET_KEY",
-    "change-this-secret-key",
+    secrets.token_hex(32)
+)
+
+
+ADMIN_USERNAME = os.environ.get(
+    "ADMIN_USERNAME",
+    ""
+).strip()
+
+ADMIN_PASSWORD = os.environ.get(
+    "ADMIN_PASSWORD",
+    ""
+)
+
+
+MQTT_BROKER = os.environ.get(
+    "MQTT_BROKER",
+    ""
+).strip()
+
+MQTT_PORT = int(
+    os.environ.get(
+        "MQTT_PORT",
+        "8883"
+    )
+)
+
+MQTT_USERNAME = os.environ.get(
+    "MQTT_USERNAME",
+    ""
+)
+
+MQTT_PASSWORD = os.environ.get(
+    "MQTT_PASSWORD",
+    ""
+)
+
+
+ESP32_OFFLINE_AFTER_SECONDS = int(
+    os.environ.get(
+        "ESP32_OFFLINE_AFTER_SECONDS",
+        "20"
+    )
 )
 
 
 # ============================================================
-# FIREBASE / FIRESTORE
+# FIREBASE
 # ============================================================
 
 FIREBASE_SERVICE_ACCOUNT = os.environ.get(
     "FIREBASE_SERVICE_ACCOUNT",
-    "",
+    ""
 ).strip()
+
 
 if not FIREBASE_SERVICE_ACCOUNT:
     raise RuntimeError(
-        "FIREBASE_SERVICE_ACCOUNT environment variable is missing."
+        "FIREBASE_SERVICE_ACCOUNT environment variable is required."
     )
 
+
 try:
-    service_account_info = json.loads(
+
+    firebase_info = json.loads(
         FIREBASE_SERVICE_ACCOUNT
     )
 
@@ -71,7 +109,7 @@ if not firebase_admin._apps:
 
     firebase_admin.initialize_app(
         credentials.Certificate(
-            service_account_info
+            firebase_info
         )
     )
 
@@ -82,26 +120,69 @@ firestore_db = firestore.client()
 USERS_COLLECTION = "users"
 HISTORY_COLLECTION = "history"
 SYSTEM_COLLECTION = "system"
-STATUS_DOCUMENT = "status"
 
 
 # ============================================================
-# TIME / HELPERS
+# DEVICE CONFIGURATION
+# ============================================================
+
+DEVICE_TOPICS = {
+
+    "light": "home/light",
+
+    "fan": "home/fan",
+
+    "geyser": "home/geyser",
+
+}
+
+
+DEVICE_NAMES = {
+
+    "light": "Light",
+
+    "fan": "Fan",
+
+    "geyser": "Geyser",
+
+}
+
+
+# ============================================================
+# MQTT STATE
+# ============================================================
+
+mqtt_client = None
+
+mqtt_connected = False
+
+
+latest_status = {
+
+    "devices": {
+        "light": "OFF",
+        "fan": "OFF",
+        "geyser": "OFF",
+    },
+
+    "sensors": {
+        "temperature": None,
+        "humidity": None,
+        "gas": "--",
+        "gas_raw": None,
+    },
+
+    "updated_at": None,
+
+}
+
+
+# ============================================================
+# TIME HELPERS
 # ============================================================
 
 IST = timezone(
-    timedelta(
-        hours=5,
-        minutes=30,
-    )
-)
-
-
-ESP32_OFFLINE_AFTER_SECONDS = int(
-    os.environ.get(
-        "ESP32_OFFLINE_AFTER_SECONDS",
-        "20",
-    )
+    timedelta(hours=5, minutes=30)
 )
 
 
@@ -112,650 +193,360 @@ def utc_now():
     )
 
 
-def as_utc_datetime(value):
+def to_ist_string(value):
 
-    if value is None:
-        return None
+    if not value:
+        return "—"
 
-    if isinstance(
-        value,
-        datetime,
-    ):
+    try:
 
-        if value.tzinfo is None:
+        if hasattr(value, "timestamp"):
 
-            return value.replace(
-                tzinfo=timezone.utc
-            )
+            dt = value
 
-        return value.astimezone(
-            timezone.utc
-        )
+            if dt.tzinfo is None:
 
-    if isinstance(
-        value,
-        str,
-    ):
-
-        text = value.strip()
-
-        try:
-
-            parsed = datetime.fromisoformat(
-                text.replace(
-                    "Z",
-                    "+00:00",
-                )
-            )
-
-            if parsed.tzinfo is None:
-
-                parsed = parsed.replace(
+                dt = dt.replace(
                     tzinfo=timezone.utc
                 )
 
-            return parsed.astimezone(
-                timezone.utc
-            )
+        elif isinstance(value, datetime):
 
-        except ValueError:
+            dt = value
 
-            return None
+            if dt.tzinfo is None:
 
-    return None
+                dt = dt.replace(
+                    tzinfo=timezone.utc
+                )
 
+        else:
 
-def format_ist(value):
+            return str(value)
 
-    dt = as_utc_datetime(
-        value
-    )
-
-    if not dt:
-
-        return "—"
-
-    return dt.astimezone(
-        IST
-    ).strftime(
-        "%d-%m-%Y %I:%M:%S %p"
-    )
-
-
-def normalize_login_identifier(
-    value,
-):
-
-    value = (
-        value or ""
-    ).strip()
-
-    if "@" in value:
-
-        return value.lower()
-
-    value = re.sub(
-        r"[\s().-]",
-        "",
-        value,
-    )
-
-    if value.startswith(
-        "00"
-    ):
-
-        value = (
-            "+"
-            + value[2:]
+        return dt.astimezone(
+            IST
+        ).strftime(
+            "%Y-%m-%d %H:%M:%S"
         )
 
-    if value.startswith(
-        "+"
-    ):
+    except Exception:
 
-        return (
-            "+"
-            + re.sub(
-                r"\D",
-                "",
-                value[1:],
-            )
-        )
-
-    return re.sub(
-        r"\D",
-        "",
-        value,
-    )
-
-
-def is_email(value):
-
-    return bool(
-        re.fullmatch(
-            r"[^\s@]+@[^\s@]+\.[^\s@]+",
-            value or "",
-        )
-    )
-
-
-def is_phone(value):
-
-    digits = re.sub(
-        r"\D",
-        "",
-        value or "",
-    )
-
-    return (
-        10
-        <= len(digits)
-        <= 15
-    )
-
-
-def valid_login_identifier(
-    value,
-):
-
-    return (
-        is_email(value)
-        or is_phone(value)
-    )
-
-
-def user_display_value(
-    user,
-):
-
-    if not user:
-
-        return "Unknown"
-
-    return user.get(
-        "login_id",
-        "Unknown",
-    )
+        return str(value)
 
 
 # ============================================================
-# MQTT CONFIGURATION
+# PASSWORD HASHING
 # ============================================================
 
-MQTT_BROKER = os.environ.get(
-    "MQTT_BROKER",
-    "bravetawny-af88996b.a02.usw2.aws.hivemq.cloud",
+from werkzeug.security import (
+    generate_password_hash,
+    check_password_hash,
 )
-
-MQTT_PORT = int(
-    os.environ.get(
-        "MQTT_PORT",
-        "8883",
-    )
-)
-
-MQTT_USERNAME = os.environ.get(
-    "MQTT_USERNAME",
-    "",
-)
-
-MQTT_PASSWORD = os.environ.get(
-    "MQTT_PASSWORD",
-    "",
-)
-
-
-# ============================================================
-# ADMIN CONFIGURATION
-# ============================================================
-
-ADMIN_USERNAME = os.environ.get(
-    "ADMIN_USERNAME",
-    "admin",
-)
-
-ADMIN_PASSWORD = os.environ.get(
-    "ADMIN_PASSWORD",
-    "admin",
-)
-
-
-# ============================================================
-# MQTT TOPICS
-# ============================================================
-
-TOPIC_LIGHT = "home/light"
-
-TOPIC_FAN = "home/fan"
-
-TOPIC_GEYSER = "home/geyser"
-
-TOPIC_STATUS = "home/status"
-
-
-# ============================================================
-# LOCAL RUNTIME CACHE
-# ============================================================
-
-device_state = {
-
-    "light": "OFF",
-
-    "fan": "OFF",
-
-    "geyser": "OFF",
-}
-
-
-sensor_state = {
-
-    "temperature": "--",
-
-    "humidity": "--",
-
-    "gas": "--",
-
-    "gas_raw": 0,
-}
-
-
-mqtt_client = None
-
-mqtt_connected = False
-
-mqtt_last_error = ""
-
-mqtt_lock = threading.Lock()
 
 
 # ============================================================
 # FIRESTORE HELPERS
 # ============================================================
 
-def status_ref():
+def normalize_login_id(value):
 
     return (
-        firestore_db
-        .collection(
-            SYSTEM_COLLECTION
-        )
-        .document(
-            STATUS_DOCUMENT
-        )
+        str(value or "")
+        .strip()
+        .lower()
     )
 
 
-def user_doc_to_dict(
-    doc,
-):
+def get_user_by_login_id(login_id):
 
-    data = (
-        doc.to_dict()
-        or {}
+    login_id = normalize_login_id(
+        login_id
     )
 
-    data["id"] = doc.id
-
-    data[
-        "created_at_display"
-    ] = format_ist(
-        data.get(
-            "created_at"
-        )
-    )
-
-    return data
-
-
-def history_doc_to_dict(
-    doc,
-):
-
-    data = (
-        doc.to_dict()
-        or {}
-    )
-
-    data["id"] = doc.id
-
-    data[
-        "created_at_display"
-    ] = format_ist(
-        data.get(
-            "created_at"
-        )
-    )
-
-    return data
-
-
-def find_user_by_login(
-    login_id,
-):
-
-    normalized = (
-        normalize_login_identifier(
-            login_id
-        )
-    )
-
-    if not normalized:
-
+    if not login_id:
         return None
 
     query = (
         firestore_db
-        .collection(
-            USERS_COLLECTION
-        )
+        .collection(USERS_COLLECTION)
         .where(
             "login_id",
             "==",
-            normalized,
+            login_id
         )
         .limit(1)
         .stream()
     )
 
-    for doc in query:
+    for document in query:
 
-        return user_doc_to_dict(
-            doc
-        )
+        data = document.to_dict() or {}
+
+        data["id"] = document.id
+
+        return data
 
     return None
 
 
-def get_user_by_id(
-    user_id,
-):
+def get_user_by_id(user_id):
 
     if not user_id:
-
         return None
 
-    doc = (
+    document = (
         firestore_db
-        .collection(
-            USERS_COLLECTION
-        )
-        .document(
-            str(user_id)
-        )
+        .collection(USERS_COLLECTION)
+        .document(user_id)
         .get()
     )
 
-    if not doc.exists:
-
+    if not document.exists:
         return None
 
-    return user_doc_to_dict(
-        doc
-    )
+    data = document.to_dict() or {}
+
+    data["id"] = document.id
+
+    return data
 
 
-def init_db():
+def create_admin_if_needed():
 
-    status_document = (
-        status_ref().get()
-    )
-
-    if not status_document.exists:
-
-        status_ref().set(
-            {
-
-                "light": "OFF",
-
-                "fan": "OFF",
-
-                "geyser": "OFF",
-
-                "temperature": "--",
-
-                "humidity": "--",
-
-                "gas": "--",
-
-                "gas_raw": 0,
-
-                "updated_at": None,
-            }
-        )
-
-    admin_login = (
-        normalize_login_identifier(
-            ADMIN_USERNAME
-        )
-    )
-
-    if not valid_login_identifier(
-        admin_login
-    ):
-
-        print(
-            "WARNING: ADMIN_USERNAME is not "
-            "an email or phone number. "
-            "Update it in Render before "
-            "relying on email/phone login.",
-            flush=True,
-        )
-
-    existing_admin = (
-        find_user_by_login(
-            admin_login
-        )
-    )
-
-    if not existing_admin:
-
-        (
-            firestore_db
-            .collection(
-                USERS_COLLECTION
-            )
-            .add(
-                {
-
-                    "login_id": admin_login,
-
-                    "password_hash":
-                        generate_password_hash(
-                            ADMIN_PASSWORD
-                        ),
-
-                    "role": "ADMIN",
-
-                    "status": "ACTIVE",
-
-                    "created_at":
-                        firestore.SERVER_TIMESTAMP,
-                }
-            )
-        )
-
-        print(
-            "Firebase admin account created.",
-            flush=True,
-        )
-
-
-def read_latest_status():
-
-    doc = (
-        status_ref().get()
-    )
-
-    data = (
-        doc.to_dict()
-        if doc.exists
-        else {}
-    )
-
-    devices = {
-
-        "light":
-            str(
-                data.get(
-                    "light",
-                    "OFF",
-                )
-            ).upper(),
-
-        "fan":
-            str(
-                data.get(
-                    "fan",
-                    "OFF",
-                )
-            ).upper(),
-
-        "geyser":
-            str(
-                data.get(
-                    "geyser",
-                    "OFF",
-                )
-            ).upper(),
-    }
-
-    sensors = {
-
-        "temperature":
-            data.get(
-                "temperature",
-                "--",
-            ),
-
-        "humidity":
-            data.get(
-                "humidity",
-                "--",
-            ),
-
-        "gas":
-            data.get(
-                "gas",
-                "--",
-            ),
-
-        "gas_raw":
-            data.get(
-                "gas_raw",
-                0,
-            ),
-    }
-
-    updated_at = data.get(
-        "updated_at"
-    )
-
-    return (
-        devices,
-        sensors,
-        updated_at,
-    )
-
-
-def write_latest_status(
-    devices,
-    sensors,
-):
-
-    status_ref().set(
-        {
-
-            "light":
-                str(
-                    devices.get(
-                        "light",
-                        "OFF",
-                    )
-                ).upper(),
-
-            "fan":
-                str(
-                    devices.get(
-                        "fan",
-                        "OFF",
-                    )
-                ).upper(),
-
-            "geyser":
-                str(
-                    devices.get(
-                        "geyser",
-                        "OFF",
-                    )
-                ).upper(),
-
-            "temperature":
-                sensors.get(
-                    "temperature",
-                    "--",
-                ),
-
-            "humidity":
-                sensors.get(
-                    "humidity",
-                    "--",
-                ),
-
-            "gas":
-                sensors.get(
-                    "gas",
-                    "--",
-                ),
-
-            "gas_raw":
-                int(
-                    sensors.get(
-                        "gas_raw",
-                        0,
-                    )
-                    or 0
-                ),
-
-            "updated_at":
-                firestore.SERVER_TIMESTAMP,
-        },
-        merge=True,
-    )
-
-
-def set_device_status(
-    device,
-    action,
-):
-
-    if device not in {
-        "light",
-        "fan",
-        "geyser",
-    }:
-
+    if not ADMIN_USERNAME or not ADMIN_PASSWORD:
         return
 
-    status_ref().set(
-        {
-            device:
-                action.upper()
-        },
-        merge=True,
+    login_id = normalize_login_id(
+        ADMIN_USERNAME
     )
 
+    existing = get_user_by_login_id(
+        login_id
+    )
 
-def esp32_status_info(
-    updated_at,
+    if existing:
+        return
+
+    firestore_db.collection(
+        USERS_COLLECTION
+    ).add({
+
+        "login_id": login_id,
+
+        "password_hash":
+            generate_password_hash(
+                ADMIN_PASSWORD
+            ),
+
+        "role": "ADMIN",
+
+        "status": "ACTIVE",
+
+        "created_at":
+            firestore.SERVER_TIMESTAMP,
+
+    })
+
+
+def get_all_users():
+
+    documents = (
+        firestore_db
+        .collection(USERS_COLLECTION)
+        .order_by(
+            "created_at",
+            direction=firestore.Query.DESCENDING
+        )
+        .stream()
+    )
+
+    users = []
+
+    for document in documents:
+
+        data = document.to_dict() or {}
+
+        data["id"] = document.id
+
+        data["created_at_display"] = (
+            to_ist_string(
+                data.get("created_at")
+            )
+        )
+
+        users.append(data)
+
+    return users
+
+
+def add_history(
+    login_id,
+    device,
+    action,
+    result,
+    event_type="Device Command"
 ):
 
-    last_seen_dt = (
-        as_utc_datetime(
-            updated_at
+    firestore_db.collection(
+        HISTORY_COLLECTION
+    ).add({
+
+        "created_at":
+            firestore.SERVER_TIMESTAMP,
+
+        "login_id":
+            login_id,
+
+        "device":
+            device,
+
+        "action":
+            action,
+
+        "result":
+            result,
+
+        "event_type":
+            event_type,
+
+    })
+
+
+def get_history():
+
+    documents = (
+        firestore_db
+        .collection(HISTORY_COLLECTION)
+        .order_by(
+            "created_at",
+            direction=firestore.Query.DESCENDING
+        )
+        .limit(500)
+        .stream()
+    )
+
+    rows = []
+
+    for document in documents:
+
+        data = document.to_dict() or {}
+
+        created_at =
+            data.get("created_at")
+
+        rows.append({
+
+            "created_at":
+                to_ist_string(
+                    created_at
+                ),
+
+            "user":
+                data.get(
+                    "login_id",
+                    "—"
+                ),
+
+            "device":
+                data.get(
+                    "device",
+                    "—"
+                ),
+
+            "action":
+                data.get(
+                    "action",
+                    "—"
+                ),
+
+            "event":
+                data.get(
+                    "event_type",
+                    "Device Command"
+                ),
+
+            "result":
+                data.get(
+                    "result",
+                    "SUCCESS"
+                ),
+
+        })
+
+    return rows
+
+
+# ============================================================
+# LATEST STATUS
+# ============================================================
+
+def save_latest_status():
+
+    firestore_db.collection(
+        SYSTEM_COLLECTION
+    ).document("status").set({
+
+        "devices":
+            latest_status["devices"],
+
+        "sensors":
+            latest_status["sensors"],
+
+        "updated_at":
+            firestore.SERVER_TIMESTAMP,
+
+    })
+
+
+def load_latest_status():
+
+    global latest_status
+
+    document = (
+        firestore_db
+        .collection(SYSTEM_COLLECTION)
+        .document("status")
+        .get()
+    )
+
+    if not document.exists:
+        return
+
+    data = document.to_dict() or {}
+
+    if data.get("devices"):
+
+        latest_status["devices"].update(
+            data["devices"]
+        )
+
+    if data.get("sensors"):
+
+        latest_status["sensors"].update(
+            data["sensors"]
+        )
+
+    if data.get("updated_at"):
+
+        latest_status["updated_at"] = (
+            data["updated_at"]
+        )
+
+
+# ============================================================
+# ESP32 STATUS
+# ============================================================
+
+def get_esp32_status():
+
+    updated_at = (
+        latest_status.get(
+            "updated_at"
         )
     )
 
-    if not last_seen_dt:
+    if not updated_at:
 
         return {
 
@@ -763,346 +554,55 @@ def esp32_status_info(
 
             "last_seen": None,
 
-            "last_seen_display": "Never",
-
-            "age_seconds": None,
         }
 
-    age = max(
-        0,
-        int(
-            (
-                utc_now()
-                - last_seen_dt
-            ).total_seconds()
-        ),
-    )
+
+    try:
+
+        if hasattr(
+            updated_at,
+            "timestamp"
+        ):
+
+            last_timestamp = (
+                updated_at.timestamp()
+            )
+
+        else:
+
+            last_timestamp = (
+                updated_at.timestamp()
+            )
+
+        age = (
+            time.time()
+            - last_timestamp
+        )
+
+        online = (
+            age <=
+            ESP32_OFFLINE_AFTER_SECONDS
+        )
+
+    except Exception:
+
+        online = False
+
 
     return {
 
-        "online":
-            age
-            <= ESP32_OFFLINE_AFTER_SECONDS,
+        "online": online,
 
         "last_seen":
-            last_seen_dt.isoformat(),
-
-        "last_seen_display":
-            format_ist(
-                last_seen_dt
+            to_ist_string(
+                updated_at
             ),
 
-        "age_seconds":
-            age,
     }
 
 
 # ============================================================
-# CSRF
-# ============================================================
-
-def get_csrf_token():
-
-    if (
-        "csrf_token"
-        not in session
-    ):
-
-        session[
-            "csrf_token"
-        ] = secrets.token_urlsafe(
-            32
-        )
-
-    return session[
-        "csrf_token"
-    ]
-
-
-@app.before_request
-def protect_post_requests():
-
-    if request.method != "POST":
-
-        return None
-
-    token = (
-        request.form.get(
-            "csrf_token"
-        )
-        or request.headers.get(
-            "X-CSRF-Token"
-        )
-    )
-
-    expected = session.get(
-        "csrf_token"
-    )
-
-    if (
-        not expected
-        or not token
-        or not secrets.compare_digest(
-            token,
-            expected,
-        )
-    ):
-
-        return jsonify(
-            {
-
-                "success": False,
-
-                "error":
-                    "Invalid security token. "
-                    "Please refresh the page.",
-            }
-        ), 403
-
-    return None
-
-
-# ============================================================
-# HISTORY
-# ============================================================
-
-def add_history(
-    username,
-    device,
-    action,
-    result,
-    event_type="Device Control",
-):
-
-    (
-        firestore_db
-        .collection(
-            HISTORY_COLLECTION
-        )
-        .add(
-            {
-
-                "created_at":
-                    firestore.SERVER_TIMESTAMP,
-
-                "username":
-                    username,
-
-                "device":
-                    device,
-
-                "action":
-                    action,
-
-                "result":
-                    result,
-
-                "event_type":
-                    event_type,
-            }
-        )
-    )
-
-
-def get_history(
-    filters=None,
-    limit=500,
-):
-
-    filters = (
-        filters
-        or {}
-    )
-
-    docs = (
-        firestore_db
-        .collection(
-            HISTORY_COLLECTION
-        )
-        .order_by(
-            "created_at",
-            direction=
-                firestore.Query.DESCENDING,
-        )
-        .limit(
-            limit
-        )
-        .stream()
-    )
-
-    rows = [
-
-        history_doc_to_dict(
-            doc
-        )
-
-        for doc in docs
-    ]
-
-    def matches(row):
-
-        for key in (
-            "username",
-            "device",
-            "action",
-            "event_type",
-        ):
-
-            wanted = (
-                filters.get(
-                    key
-                )
-                or ""
-            ).strip()
-
-            if (
-                wanted
-                and str(
-                    row.get(
-                        key,
-                        "",
-                    )
-                ).lower()
-                != wanted.lower()
-            ):
-
-                return False
-
-        return True
-
-    return [
-        row
-        for row in rows
-        if matches(row)
-    ]
-
-
-# ============================================================
-# AUTHENTICATION
-# ============================================================
-
-def current_user():
-
-    return get_user_by_id(
-        session.get(
-            "user_id"
-        )
-    )
-
-
-def login_required(
-    view
-):
-
-    @wraps(view)
-    def wrapped(
-        *args,
-        **kwargs
-    ):
-
-        user = current_user()
-
-        if not user:
-
-            return redirect(
-                url_for(
-                    "login"
-                )
-            )
-
-        if (
-            user.get(
-                "status"
-            )
-            != "ACTIVE"
-        ):
-
-            session.clear()
-
-            flash(
-                "Your account is not approved yet.",
-                "error",
-            )
-
-            return redirect(
-                url_for(
-                    "login"
-                )
-            )
-
-        return view(
-            *args,
-            **kwargs
-        )
-
-    return wrapped
-
-
-def admin_required(
-    view
-):
-
-    @wraps(view)
-    def wrapped(
-        *args,
-        **kwargs
-    ):
-
-        user = current_user()
-
-        if not user:
-
-            return redirect(
-                url_for(
-                    "login"
-                )
-            )
-
-        if (
-            user.get(
-                "status"
-            )
-            != "ACTIVE"
-            or user.get(
-                "role"
-            )
-            != "ADMIN"
-        ):
-
-            flash(
-                "Administrator access required.",
-                "error",
-            )
-
-            return redirect(
-                url_for(
-                    "dashboard"
-                )
-            )
-
-        return view(
-            *args,
-            **kwargs
-        )
-
-    return wrapped
-
-
-@app.context_processor
-def inject_template_values():
-
-    return {
-
-        "csrf_token":
-            get_csrf_token(),
-
-        "current_user":
-            current_user(),
-    }
-
-
-# ============================================================
-# MQTT STATUS CALLBACKS
+# MQTT CALLBACKS
 # ============================================================
 
 def mqtt_on_connect(
@@ -1110,71 +610,20 @@ def mqtt_on_connect(
     userdata,
     flags,
     reason_code,
-    properties=None,
+    properties=None
 ):
 
     global mqtt_connected
-    global mqtt_last_error
 
-    if reason_code == 0:
+    mqtt_connected = (
+        reason_code == 0
+    )
 
-        mqtt_connected = True
+    if mqtt_connected:
 
-        mqtt_last_error = ""
-
-        for topic in [
-
-            TOPIC_LIGHT,
-
-            TOPIC_FAN,
-
-            TOPIC_GEYSER,
-
-            TOPIC_STATUS,
-        ]:
-
-            try:
-
-                result, _ = (
-                    client.subscribe(
-                        topic
-                    )
-                )
-
-                print(
-                    "MQTT subscribe:",
-                    topic,
-                    result,
-                    flush=True,
-                )
-
-            except Exception as exc:
-
-                print(
-                    "MQTT subscribe error:",
-                    topic,
-                    exc,
-                    flush=True,
-                )
-
-        print(
-            "MQTT connected successfully:",
-            reason_code,
-            flush=True,
-        )
-
-    else:
-
-        mqtt_connected = False
-
-        mqtt_last_error = str(
-            reason_code
-        )
-
-        print(
-            "MQTT connection failed:",
-            reason_code,
-            flush=True,
+        client.subscribe(
+            "home/status",
+            qos=0
         )
 
 
@@ -1183,736 +632,264 @@ def mqtt_on_disconnect(
     userdata,
     disconnect_flags,
     reason_code,
-    properties=None,
+    properties=None
 ):
 
     global mqtt_connected
-    global mqtt_last_error
 
     mqtt_connected = False
-
-    mqtt_last_error = str(
-        reason_code
-    )
-
-    print(
-        "MQTT disconnected:",
-        reason_code,
-        flush=True,
-    )
 
 
 def mqtt_on_message(
     client,
     userdata,
-    msg,
+    message
 ):
 
-    global device_state
-    global sensor_state
+    global latest_status
+
+    if message.topic != "home/status":
+        return
 
     try:
 
-        payload = (
-            msg.payload.decode(
+        payload = json.loads(
+            message.payload.decode(
                 "utf-8"
             )
         )
 
-        print(
-            "MQTT MESSAGE RECEIVED:",
-            msg.topic,
-            flush=True,
-        )
+    except Exception:
 
-        print(
-            "MQTT PAYLOAD:",
-            payload,
-            flush=True,
-        )
+        return
 
-        if (
-            msg.topic
-            != TOPIC_STATUS
-        ):
 
-            return
+    devices = payload.get(
+        "devices",
+        {}
+    )
 
-        data = json.loads(
-            payload
-        )
+    sensors = payload.get(
+        "sensors",
+        {}
+    )
 
-        devices = data.get(
-            "devices",
-            {}
-        )
 
-        sensors = data.get(
-            "sensors",
-            {}
-        )
+    if devices:
 
-        (
-            current_devices,
-            current_sensors,
-            _,
-        ) = read_latest_status()
+        for device in DEVICE_TOPICS:
 
-        if "light" in devices:
+            if device in devices:
 
-            current_devices[
-                "light"
-            ] = str(
-                devices[
-                    "light"
-                ]
-            ).upper()
+                latest_status[
+                    "devices"
+                ][device] = str(
+                    devices[device]
+                ).upper()
 
-        if "fan" in devices:
 
-            current_devices[
-                "fan"
-            ] = str(
-                devices[
-                    "fan"
-                ]
-            ).upper()
+    if sensors:
 
-        if "geyser" in devices:
+        latest_status[
+            "sensors"
+        ].update({
 
-            current_devices[
-                "geyser"
-            ] = str(
-                devices[
-                    "geyser"
-                ]
-            ).upper()
+            "temperature":
+                sensors.get(
+                    "temperature"
+                ),
 
-        if "temperature" in sensors:
+            "humidity":
+                sensors.get(
+                    "humidity"
+                ),
 
-            current_sensors[
-                "temperature"
-            ] = sensors[
-                "temperature"
-            ]
+            "gas":
+                sensors.get(
+                    "gas",
+                    "--"
+                ),
 
-        if "humidity" in sensors:
+            "gas_raw":
+                sensors.get(
+                    "gas_raw"
+                ),
 
-            current_sensors[
-                "humidity"
-            ] = sensors[
-                "humidity"
-            ]
+        })
 
-        if "gas" in sensors:
 
-            current_sensors[
-                "gas"
-            ] = sensors[
-                "gas"
-            ]
+    latest_status[
+        "updated_at"
+    ] = utc_now()
 
-        if "gas_raw" in sensors:
 
-            current_sensors[
-                "gas_raw"
-            ] = sensors[
-                "gas_raw"
-            ]
-
-        write_latest_status(
-            current_devices,
-            current_sensors,
-        )
-
-        with mqtt_lock:
-
-            device_state.update(
-                current_devices
-            )
-
-            sensor_state.update(
-                current_sensors
-            )
-
-        print(
-            "MQTT STATUS UPDATED SUCCESSFULLY",
-            flush=True,
-        )
-
-        print(
-            "TEMPERATURE:",
-            current_sensors.get(
-                "temperature"
-            ),
-            flush=True,
-        )
-
-        print(
-            "HUMIDITY:",
-            current_sensors.get(
-                "humidity"
-            ),
-            flush=True,
-        )
-
-        print(
-            "GAS:",
-            current_sensors.get(
-                "gas"
-            ),
-            flush=True,
-        )
-
-    except Exception as exc:
-
-        print(
-            "MQTT MESSAGE ERROR:",
-            type(exc).__name__,
-            str(exc),
-            flush=True,
-        )
+    save_latest_status()
 
 
 # ============================================================
-# MQTT CLIENT FOR STATUS MONITORING
+# MQTT CONNECTION
 # ============================================================
-
-def create_mqtt_client():
-
-    client = mqtt.Client(
-        mqtt.CallbackAPIVersion.VERSION2,
-        client_id=(
-            f"home-iot-status-"
-            f"{os.getpid()}-"
-            f"{int(time.time())}-"
-            f"{secrets.token_hex(3)}"
-        ),
-    )
-
-    client.username_pw_set(
-        MQTT_USERNAME,
-        MQTT_PASSWORD,
-    )
-
-    client.tls_set()
-
-    client.on_connect = (
-        mqtt_on_connect
-    )
-
-    client.on_disconnect = (
-        mqtt_on_disconnect
-    )
-
-    client.on_message = (
-        mqtt_on_message
-    )
-
-    return client
-
-
-def ensure_mqtt_connection():
-
-    global mqtt_connected
-    global mqtt_last_error
-
-    client = mqtt_client
-
-    if client is None:
-
-        mqtt_connected = False
-
-        if not mqtt_last_error:
-
-            mqtt_last_error = (
-                "MQTT client is not initialized."
-            )
-
-        return False
-
-    try:
-
-        connected = (
-            client.is_connected()
-        )
-
-        mqtt_connected = connected
-
-        if connected:
-
-            mqtt_last_error = ""
-
-        return connected
-
-    except Exception as exc:
-
-        mqtt_connected = False
-
-        mqtt_last_error = (
-            f"{type(exc).__name__}: {exc}"
-        )
-
-        print(
-            "MQTT STATE CHECK ERROR:",
-            mqtt_last_error,
-            flush=True,
-        )
-
-        return False
-
 
 def start_mqtt():
 
     global mqtt_client
     global mqtt_connected
-    global mqtt_last_error
-
-    print(
-        "Starting MQTT background client",
-        flush=True,
-    )
 
     if not MQTT_BROKER:
-
-        mqtt_connected = False
-
-        mqtt_last_error = (
-            "MQTT_BROKER is empty."
-        )
-
-        return
-
-    if not MQTT_USERNAME:
-
-        mqtt_connected = False
-
-        mqtt_last_error = (
-            "MQTT_USERNAME is empty."
-        )
-
-        return
-
-    if not MQTT_PASSWORD:
-
-        mqtt_connected = False
-
-        mqtt_last_error = (
-            "MQTT_PASSWORD is empty."
-        )
-
         return
 
     try:
 
-        client = (
-            create_mqtt_client()
+        mqtt_client = mqtt.Client(
+            mqtt.CallbackAPIVersion.VERSION2,
+            client_id=(
+                "home-iot-server-"
+                + secrets.token_hex(5)
+            )
         )
 
-        mqtt_client = client
+        mqtt_client.username_pw_set(
+            MQTT_USERNAME,
+            MQTT_PASSWORD
+        )
 
-        print(
-            "Connecting MQTT to:",
+        mqtt_client.tls_set()
+
+        mqtt_client.on_connect = (
+            mqtt_on_connect
+        )
+
+        mqtt_client.on_disconnect = (
+            mqtt_on_disconnect
+        )
+
+        mqtt_client.on_message = (
+            mqtt_on_message
+        )
+
+        mqtt_client.connect(
             MQTT_BROKER,
             MQTT_PORT,
-            flush=True,
+            60
         )
 
-        client.connect(
-            MQTT_BROKER,
-            MQTT_PORT,
-            60,
-        )
-
-        client.loop_start()
-
-        print(
-            "MQTT NETWORK LOOP STARTED.",
-            flush=True,
-        )
-
-        deadline = (
-            time.time()
-            + 5
-        )
-
-        while (
-            time.time()
-            < deadline
-        ):
-
-            if client.is_connected():
-
-                mqtt_connected = True
-
-                mqtt_last_error = ""
-
-                print(
-                    "MQTT CONNECTED SUCCESSFULLY.",
-                    flush=True,
-                )
-
-                return
-
-            time.sleep(
-                0.1
-            )
-
-        mqtt_connected = (
-            client.is_connected()
-        )
-
-        if not mqtt_connected:
-
-            mqtt_last_error = (
-                "MQTT connection did not complete."
-            )
-
-            print(
-                "MQTT CONNECTION TIMEOUT:",
-                mqtt_last_error,
-                flush=True,
-            )
+        mqtt_client.loop_start()
 
     except Exception as exc:
 
         mqtt_connected = False
 
-        mqtt_last_error = (
-            f"{type(exc).__name__}: {exc}"
-        )
-
         print(
-            "MQTT START ERROR:",
-            mqtt_last_error,
-            flush=True,
+            "MQTT connection error:",
+            exc
         )
 
 
 # ============================================================
-# DEDICATED MQTT COMMAND PUBLISHER
+# DEDICATED MQTT COMMAND
 # ============================================================
 
 def publish_device_command(
     device,
-    action,
+    action
 ):
 
-    topics = {
-
-        "light":
-            TOPIC_LIGHT,
-
-        "fan":
-            TOPIC_FAN,
-
-        "geyser":
-            TOPIC_GEYSER,
-    }
-
-    topic = topics.get(
-        device
-    )
-
-    if not topic:
-
-        print(
-            "MQTT COMMAND ERROR: invalid device =",
-            device,
-            flush=True,
-        )
+    if device not in DEVICE_TOPICS:
 
         return False
 
-    payload = action.upper()
 
-    if payload not in {
+    action = str(
+        action
+    ).upper()
+
+
+    if action not in (
         "ON",
-        "OFF",
-    }:
-
-        print(
-            "MQTT COMMAND ERROR: invalid action =",
-            payload,
-            flush=True,
-        )
+        "OFF"
+    ):
 
         return False
+
 
     command_client = None
 
-    client_id = (
-        f"home-iot-command-"
-        f"{os.getpid()}-"
-        f"{int(time.time() * 1000)}-"
-        f"{secrets.token_hex(4)}"
-    )
 
     try:
 
-        print(
-            "================================================",
-            flush=True,
-        )
-
-        print(
-            "MQTT DEDICATED COMMAND START",
-            flush=True,
-        )
-
-        print(
-            "Device:",
-            device,
-            flush=True,
-        )
-
-        print(
-            "Topic:",
-            topic,
-            flush=True,
-        )
-
-        print(
-            "Payload:",
-            payload,
-            flush=True,
-        )
-
-        print(
-            "QoS: 0",
-            flush=True,
-        )
-
-        print(
-            "Retain: True",
-            flush=True,
-        )
-
-        print(
-            "Command Client ID:",
-            client_id,
-            flush=True,
-        )
-
         command_client = mqtt.Client(
             mqtt.CallbackAPIVersion.VERSION2,
-            client_id=client_id,
+            client_id=(
+                "home-iot-command-"
+                + secrets.token_hex(6)
+            )
         )
+
 
         command_client.username_pw_set(
             MQTT_USERNAME,
-            MQTT_PASSWORD,
+            MQTT_PASSWORD
         )
+
 
         command_client.tls_set()
 
-        print(
-            "MQTT COMMAND: connecting...",
-            flush=True,
-        )
 
         command_client.connect(
             MQTT_BROKER,
             MQTT_PORT,
-            60,
+            60
         )
 
-        print(
-            "MQTT COMMAND: connected.",
-            flush=True,
-        )
 
         command_client.loop_start()
 
-        deadline = (
-            time.time()
-            + 5
+
+        result = command_client.publish(
+            DEVICE_TOPICS[device],
+
+            payload=action,
+
+            qos=0,
+
+            retain=True
         )
 
-        while (
-            time.time()
-            < deadline
-        ):
 
-            if command_client.is_connected():
-
-                break
-
-            time.sleep(
-                0.05
-            )
-
-        if not command_client.is_connected():
-
-            print(
-                "MQTT COMMAND: connection not established.",
-                flush=True,
-            )
-
-            command_client.loop_stop()
-
-            try:
-
-                command_client.disconnect()
-
-            except Exception:
-
-                pass
-
-            return False
-
-        print(
-            "MQTT COMMAND: network loop running.",
-            flush=True,
+        result.wait_for_publish(
+            timeout=5
         )
 
-        result = (
-            command_client.publish(
-                topic,
-                payload=payload,
-                qos=0,
-                retain=True,
-            )
-        )
-
-        print(
-            "MQTT COMMAND PUBLISH RC:",
-            result.rc,
-            flush=True,
-        )
-
-        print(
-            "MQTT COMMAND MESSAGE ID:",
-            result.mid,
-            flush=True,
-        )
-
-        if (
-            result.rc
-            != mqtt.MQTT_ERR_SUCCESS
-        ):
-
-            print(
-                "MQTT COMMAND: publish failed.",
-                flush=True,
-            )
-
-            command_client.loop_stop()
-
-            try:
-
-                command_client.disconnect()
-
-            except Exception:
-
-                pass
-
-            return False
-
-        print(
-            "MQTT COMMAND: waiting for network publish...",
-            flush=True,
-        )
-
-        try:
-
-            result.wait_for_publish(
-                timeout=5
-            )
-
-        except Exception as exc:
-
-            print(
-                "MQTT COMMAND WAIT ERROR:",
-                type(exc).__name__,
-                str(exc),
-                flush=True,
-            )
 
         time.sleep(
             0.5
         )
 
-        try:
 
-            published = (
-                result.is_published()
-            )
-
-        except Exception:
-
-            published = False
-
-        print(
-            "MQTT COMMAND IS PUBLISHED:",
-            published,
-            flush=True,
+        published = (
+            result.rc == mqtt.MQTT_ERR_SUCCESS
+            and result.is_published()
         )
+
 
         command_client.loop_stop()
 
-        print(
-            "MQTT COMMAND: network loop stopped.",
-            flush=True,
-        )
+        command_client.disconnect()
 
-        try:
 
-            command_client.disconnect()
+        return published
 
-        except Exception:
-
-            pass
-
-        print(
-            "MQTT COMMAND: disconnected.",
-            flush=True,
-        )
-
-        print(
-            "MQTT DEDICATED COMMAND SUCCESS",
-            flush=True,
-        )
-
-        print(
-            "================================================",
-            flush=True,
-        )
-
-        return True
 
     except Exception as exc:
 
         print(
-            "================================================",
-            flush=True,
-        )
-
-        print(
-            "MQTT DEDICATED COMMAND FAILED",
-            flush=True,
-        )
-
-        print(
-            "Error type:",
-            type(exc).__name__,
-            flush=True,
-        )
-
-        print(
-            "Error:",
-            str(exc),
-            flush=True,
-        )
-
-        print(
-            "================================================",
-            flush=True,
+            "MQTT command error:",
+            exc
         )
 
         try:
 
-            if command_client is not None:
+            if command_client:
 
                 command_client.loop_stop()
 
@@ -1926,18 +903,207 @@ def publish_device_command(
 
 
 # ============================================================
-# HOME
+# AUTH DECORATORS
+# ============================================================
+
+def login_required(function):
+
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+
+        user_id = session.get(
+            "user_id"
+        )
+
+        if not user_id:
+
+            return redirect(
+                url_for("signin")
+            )
+
+        user = get_user_by_id(
+            user_id
+        )
+
+        if not user:
+
+            session.clear()
+
+            return redirect(
+                url_for("signin")
+            )
+
+        if user.get("status") != "ACTIVE":
+
+            session.clear()
+
+            flash(
+                "Your account is not active.",
+                "warning"
+            )
+
+            return redirect(
+                url_for("signin")
+            )
+
+        return function(
+            *args,
+            **kwargs
+        )
+
+    return wrapper
+
+
+def admin_required(function):
+
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+
+        user_id = session.get(
+            "user_id"
+        )
+
+        if not user_id:
+
+            return redirect(
+                url_for("signin")
+            )
+
+        user = get_user_by_id(
+            user_id
+        )
+
+        if not user:
+
+            session.clear()
+
+            return redirect(
+                url_for("signin")
+            )
+
+        if user.get("role") != "ADMIN":
+
+            flash(
+                "Administrator access required.",
+                "error"
+            )
+
+            return redirect(
+                url_for("dashboard")
+            )
+
+        return function(
+            *args,
+            **kwargs
+        )
+
+    return wrapper
+
+
+# ============================================================
+# CURRENT USER
+# ============================================================
+
+def get_current_user():
+
+    user_id = session.get(
+        "user_id"
+    )
+
+    if not user_id:
+        return None
+
+    return get_user_by_id(
+        user_id
+    )
+
+
+@app.context_processor
+def inject_current_user():
+
+    return {
+
+        "current_user":
+            get_current_user(),
+
+        "csrf_token":
+            session.get(
+                "csrf_token"
+            ),
+
+    }
+
+
+# ============================================================
+# CSRF
+# ============================================================
+
+@app.before_request
+def ensure_csrf_token():
+
+    if "csrf_token" not in session:
+
+        session["csrf_token"] = secrets.token_urlsafe(
+            32
+        )
+
+
+@app.before_request
+def csrf_protection():
+
+    if request.method != "POST":
+        return
+
+    if request.endpoint in (
+        "signin",
+        "signup"
+    ):
+        return
+
+    expected = session.get(
+        "csrf_token"
+    )
+
+    supplied = (
+        request.form.get(
+            "csrf_token"
+        )
+        or request.headers.get(
+            "X-CSRF-Token"
+        )
+    )
+
+    if not expected or supplied != expected:
+
+        if request.path.startswith("/api/"):
+
+            return jsonify({
+                "error":
+                    "Invalid CSRF token."
+            }), 403
+
+        flash(
+            "Invalid security token. Please try again.",
+            "error"
+        )
+
+        return redirect(
+            request.referrer
+            or url_for("home")
+        )
+
+
+# ============================================================
+# ROUTES
 # ============================================================
 
 @app.route("/")
 def home():
 
-    if current_user():
+    if session.get("user_id"):
 
         return redirect(
-            url_for(
-                "dashboard"
-            )
+            url_for("dashboard")
         )
 
     return render_template(
@@ -1945,248 +1111,192 @@ def home():
     )
 
 
-# ============================================================
-# SIGN UP
-# ============================================================
-
 @app.route(
     "/signup",
-    methods=[
-        "GET",
-        "POST",
-    ],
+    methods=["GET", "POST"]
 )
 def signup():
 
     if request.method == "POST":
 
-        login_id = normalize_login_identifier(
+        login_id = normalize_login_id(
             request.form.get(
-                "login_id",
-                request.form.get(
-                    "username",
-                    "",
-                ),
+                "login_id"
             )
         )
 
         password = request.form.get(
             "password",
-            "",
+            ""
         )
 
         confirm_password = request.form.get(
             "confirm_password",
-            "",
+            ""
         )
 
-        if (
-            not login_id
-            or not password
-        ):
+
+        if not login_id:
 
             flash(
-                "Email/phone number and password are required.",
-                "error",
+                "Email or phone number is required.",
+                "error"
             )
 
-            return redirect(
-                url_for(
-                    "signup"
-                )
+            return render_template(
+                "signup.html"
             )
 
-        if not valid_login_identifier(
-            login_id
-        ):
-
-            flash(
-                "Enter a valid email address or phone number.",
-                "error",
-            )
-
-            return redirect(
-                url_for(
-                    "signup"
-                )
-            )
 
         if len(password) < 8:
 
             flash(
                 "Password must contain at least 8 characters.",
-                "error",
+                "error"
             )
 
-            return redirect(
-                url_for(
-                    "signup"
-                )
+            return render_template(
+                "signup.html"
             )
 
-        if (
-            password
-            != confirm_password
-        ):
+
+        if password != confirm_password:
 
             flash(
                 "Passwords do not match.",
-                "error",
+                "error"
             )
 
-            return redirect(
-                url_for(
-                    "signup"
-                )
+            return render_template(
+                "signup.html"
             )
 
-        if find_user_by_login(
+
+        if get_user_by_login_id(
             login_id
         ):
 
             flash(
-                "That email/phone number is already registered.",
-                "error",
+                "An account with this email or phone number already exists.",
+                "error"
             )
 
-            return redirect(
-                url_for(
-                    "signup"
-                )
+            return render_template(
+                "signup.html"
             )
 
-        (
-            firestore_db
-            .collection(
-                USERS_COLLECTION
-            )
-            .add(
-                {
 
-                    "login_id":
-                        login_id,
+        firestore_db.collection(
+            USERS_COLLECTION
+        ).add({
 
-                    "password_hash":
-                        generate_password_hash(
-                            password
-                        ),
+            "login_id":
+                login_id,
 
-                    "role":
-                        "USER",
+            "password_hash":
+                generate_password_hash(
+                    password
+                ),
 
-                    "status":
-                        "PENDING",
+            "role":
+                "USER",
 
-                    "created_at":
-                        firestore.SERVER_TIMESTAMP,
-                }
-            )
-        )
+            "status":
+                "PENDING",
+
+            "created_at":
+                firestore.SERVER_TIMESTAMP,
+
+        })
+
 
         return render_template(
-            "signup_success.html",
-            username=login_id,
+            "signup_success.html"
         )
+
 
     return render_template(
         "signup.html"
     )
 
 
-# ============================================================
-# SIGN IN
-# ============================================================
-
-def signin_handler():
+@app.route(
+    "/login",
+    methods=["GET", "POST"]
+)
+@app.route(
+    "/signin",
+    methods=["GET", "POST"]
+)
+def signin():
 
     if request.method == "POST":
 
-        login_id = normalize_login_identifier(
+        login_id = normalize_login_id(
             request.form.get(
-                "login_id",
-                request.form.get(
-                    "username",
-                    "",
-                ),
+                "login_id"
             )
         )
 
         password = request.form.get(
             "password",
-            "",
+            ""
         )
 
-        user = find_user_by_login(
+
+        user = get_user_by_login_id(
             login_id
         )
+
 
         if (
             not user
             or not check_password_hash(
                 user.get(
                     "password_hash",
-                    "",
+                    ""
                 ),
-                password,
+                password
             )
         ):
 
             flash(
                 "Invalid email/phone number or password.",
-                "error",
+                "error"
             )
 
-            return redirect(
-                url_for(
-                    "login"
-                )
+            return render_template(
+                "login.html"
             )
 
-        if (
-            user.get(
-                "status"
-            )
-            != "ACTIVE"
-        ):
+
+        if user.get(
+            "status"
+        ) != "ACTIVE":
 
             flash(
                 "Your account is waiting for administrator approval.",
-                "error",
+                "warning"
             )
 
-            return redirect(
-                url_for(
-                    "login"
-                )
+            return render_template(
+                "login.html"
             )
+
 
         session.clear()
 
-        session[
-            "user_id"
-        ] = user[
-            "id"
-        ]
+        session["user_id"] = user["id"]
 
-        session[
-            "login_id"
-        ] = user[
-            "login_id"
-        ]
+        session["csrf_token"] = secrets.token_urlsafe(
+            32
+        )
 
-        session[
-            "role"
-        ] = user[
-            "role"
-        ]
-
-        get_csrf_token()
 
         return redirect(
-            url_for(
-                "dashboard"
-            )
+            url_for("dashboard")
         )
+
 
     return render_template(
         "login.html"
@@ -2194,233 +1304,54 @@ def signin_handler():
 
 
 @app.route(
-    "/login",
-    methods=[
-        "GET",
-        "POST",
-    ],
-)
-def login():
-
-    return signin_handler()
-
-
-@app.route(
-    "/signin",
-    methods=[
-        "GET",
-        "POST",
-    ],
-)
-def signin():
-
-    return signin_handler()
-
-
-# ============================================================
-# LOGOUT
-# ============================================================
-
-@app.route(
     "/logout",
-    methods=[
-        "POST"
-    ],
+    methods=["POST"]
 )
+@login_required
 def logout():
 
     session.clear()
 
     return redirect(
-        url_for(
-            "home"
-        )
+        url_for("signin")
     )
 
 
-# ============================================================
-# DASHBOARD - VIEW ONLY
-# ============================================================
-
-@app.route(
-    "/dashboard"
-)
+@app.route("/dashboard")
 @login_required
 def dashboard():
 
-    ensure_mqtt_connection()
-
-    devices, sensors, updated_at = (
-        read_latest_status()
-    )
-
-    esp32 = esp32_status_info(
-        updated_at
-    )
+    load_latest_status()
 
     return render_template(
-        "index.html",
-        device_state=devices,
-        sensor_state=sensors,
-        mqtt_connected=mqtt_connected,
-        esp32=esp32,
+        "index.html"
     )
 
 
-# ============================================================
-# DEVICES - CONTROL PAGE
-# ============================================================
-
-@app.route(
-    "/devices"
-)
+@app.route("/devices")
 @login_required
 def devices():
 
-    ensure_mqtt_connection()
-
-    device_values, sensors, updated_at = (
-        read_latest_status()
-    )
-
-    esp32 = esp32_status_info(
-        updated_at
-    )
+    load_latest_status()
 
     return render_template(
-        "devices.html",
-        device_state=device_values,
-        sensor_state=sensors,
-        mqtt_connected=mqtt_connected,
-        esp32=esp32,
+        "devices.html"
     )
 
 
-# ============================================================
-# HISTORY
-# ============================================================
-
-@app.route(
-    "/history"
-)
+@app.route("/history")
 @login_required
 def history():
 
-    filters = {
-
-        "username":
-            request.args.get(
-                "user",
-                "",
-            ),
-
-        "device":
-            request.args.get(
-                "device",
-                "",
-            ),
-
-        "action":
-            request.args.get(
-                "action",
-                "",
-            ),
-
-        "event_type":
-            request.args.get(
-                "event",
-                "",
-            ),
-    }
-
-    rows = get_history(
-        filters=filters,
-        limit=500,
-    )
-
-    all_rows = get_history(
-        filters={},
-        limit=500,
-    )
-
-    users = sorted(
-        {
-            row.get(
-                "username",
-                "",
-            )
-
-            for row in all_rows
-
-            if row.get(
-                "username"
-            )
-        }
-    )
-
-    devices_filter = sorted(
-        {
-            row.get(
-                "device",
-                "",
-            )
-
-            for row in all_rows
-
-            if row.get(
-                "device"
-            )
-        }
-    )
-
-    actions = sorted(
-        {
-            row.get(
-                "action",
-                "",
-            )
-
-            for row in all_rows
-
-            if row.get(
-                "action"
-            )
-        }
-    )
-
-    events = sorted(
-        {
-            row.get(
-                "event_type",
-                "",
-            )
-
-            for row in all_rows
-
-            if row.get(
-                "event_type"
-            )
-        }
-    )
+    rows = get_history()
 
     return render_template(
         "history.html",
-        history=rows,
-        history_filters=filters,
-        history_users=users,
-        history_devices=devices_filter,
-        history_actions=actions,
-        history_events=events,
+        history=rows
     )
 
 
-# ============================================================
-# SETTINGS
-# ============================================================
-
-@app.route(
-    "/settings"
-)
+@app.route("/settings")
 @login_required
 def settings():
 
@@ -2430,163 +1361,108 @@ def settings():
 
 
 # ============================================================
-# ADMIN USER MANAGEMENT
+# ADMIN
 # ============================================================
 
-@app.route(
-    "/admin"
-)
+@app.route("/admin")
 @admin_required
 def admin_users():
 
-    docs = (
-        firestore_db
-        .collection(
-            USERS_COLLECTION
-        )
-        .order_by(
-            "created_at",
-            direction=
-                firestore.Query.DESCENDING,
-        )
-        .stream()
-    )
-
-    users = [
-
-        user_doc_to_dict(
-            doc
-        )
-
-        for doc in docs
-    ]
+    users = get_all_users()
 
     return render_template(
         "admin_users.html",
-        users=users,
+        users=users
     )
 
 
 @app.route(
     "/admin/user/<user_id>/<action>",
-    methods=[
-        "POST"
-    ],
+    methods=["POST"]
 )
 @admin_required
 def admin_user_action(
     user_id,
-    action,
+    action
 ):
 
-    if action not in {
+    if action not in (
         "approve",
-        "reject",
-        "disable",
-    }:
-
-        flash(
-            "Invalid user action.",
-            "error",
-        )
-
-        return redirect(
-            url_for(
-                "admin_users"
-            )
-        )
-
-    ref = (
-        firestore_db
-        .collection(
-            USERS_COLLECTION
-        )
-        .document(
-            str(user_id)
-        )
-    )
-
-    doc = ref.get()
-
-    if not doc.exists:
-
-        flash(
-            "User not found.",
-            "error",
-        )
-
-        return redirect(
-            url_for(
-                "admin_users"
-            )
-        )
-
-    user = (
-        doc.to_dict()
-        or {}
-    )
-
-    if (
-        user.get(
-            "role"
-        )
-        == "ADMIN"
+        "reject"
     ):
 
         flash(
-            "Administrator accounts cannot be changed here.",
-            "error",
+            "Invalid user action.",
+            "error"
         )
 
         return redirect(
-            url_for(
-                "admin_users"
-            )
+            url_for("admin_users")
         )
 
-    new_status = {
 
-        "approve":
-            "ACTIVE",
-
-        "reject":
-            "REJECTED",
-
-        "disable":
-            "DISABLED",
-
-    }[action]
-
-    ref.update(
-        {
-            "status":
-                new_status
-        }
+    user = get_user_by_id(
+        user_id
     )
 
-    add_history(
-        user_display_value(
-            current_user()
-        ),
-        "USER",
-        action.upper(),
-        "Success",
-        "User Management",
+
+    if not user:
+
+        flash(
+            "User not found.",
+            "error"
+        )
+
+        return redirect(
+            url_for("admin_users")
+        )
+
+
+    if user.get(
+        "role"
+    ) == "ADMIN":
+
+        flash(
+            "Administrator accounts are protected.",
+            "error"
+        )
+
+        return redirect(
+            url_for("admin_users")
+        )
+
+
+    new_status = (
+        "ACTIVE"
+        if action == "approve"
+        else "REJECTED"
     )
+
+
+    firestore_db.collection(
+        USERS_COLLECTION
+    ).document(
+        user_id
+    ).update({
+
+        "status":
+            new_status
+
+    })
+
 
     flash(
         (
-            f"User "
-            f"{user.get('login_id', 'Unknown')} "
-            f"is now {new_status}."
+            "User approved."
+            if action == "approve"
+            else "User disabled."
         ),
-        "success",
+        "success"
     )
 
+
     return redirect(
-        url_for(
-            "admin_users"
-        )
+        url_for("admin_users")
     )
 
 
@@ -2594,53 +1470,42 @@ def admin_user_action(
 # STATUS API
 # ============================================================
 
-@app.route(
-    "/api/status"
-)
+@app.route("/api/status")
 @login_required
 def api_status():
 
-    connected = (
-        ensure_mqtt_connection()
-    )
+    load_latest_status()
 
-    devices, sensors, updated_at = (
-        read_latest_status()
-    )
+    esp32 = get_esp32_status()
 
-    esp32 = esp32_status_info(
-        updated_at
-    )
 
-    with mqtt_lock:
+    return jsonify({
 
-        device_state.update(
-            devices
-        )
+        "devices":
+            latest_status["devices"],
 
-        sensor_state.update(
-            sensors
-        )
+        "sensors":
+            latest_status["sensors"],
 
-    return jsonify(
-        {
+        "mqtt_connected":
+            mqtt_connected,
 
-            "mqtt_connected":
-                connected,
+        "esp32":
+            esp32,
 
-            "mqtt_error":
-                mqtt_last_error,
+    })
 
-            "devices":
-                devices,
 
-            "sensors":
-                sensors,
+@app.route("/api/mqtt")
+@login_required
+def api_mqtt():
 
-            "esp32":
-                esp32,
-        }
-    )
+    return jsonify({
+
+        "connected":
+            mqtt_connected
+
+    })
 
 
 # ============================================================
@@ -2649,230 +1514,157 @@ def api_status():
 
 @app.route(
     "/api/device/<device>/<action>",
-    methods=[
-        "POST"
-    ],
+    methods=["POST"]
 )
 @login_required
-def api_device(
+def api_device_control(
     device,
-    action,
+    action
 ):
 
-    device = device.lower()
+    device = str(
+        device
+    ).lower()
 
-    action = action.upper()
+    action = str(
+        action
+    ).upper()
 
-    allowed_devices = {
 
-        "light",
+    if device not in DEVICE_TOPICS:
 
-        "fan",
+        return jsonify({
+            "error":
+                "Invalid device."
+        }), 400
 
-        "geyser",
-    }
 
-    allowed_actions = {
-
+    if action not in (
         "ON",
+        "OFF"
+    ):
 
-        "OFF",
-    }
+        return jsonify({
+            "error":
+                "Invalid action."
+        }), 400
 
-    if device not in allowed_devices:
 
-        return jsonify(
-            {
+    user = get_current_user()
 
-                "success":
-                    False,
 
-                "error":
-                    "Invalid device.",
-            }
-        ), 400
+    if not user:
 
-    if action not in allowed_actions:
+        return jsonify({
+            "error":
+                "Authentication required."
+        }), 401
 
-        return jsonify(
-            {
 
-                "success":
-                    False,
-
-                "error":
-                    "Invalid action.",
-            }
-        ), 400
-
-    success = (
-        publish_device_command(
-            device,
-            action,
-        )
+    success = publish_device_command(
+        device,
+        action
     )
 
-    username = session.get(
-        "login_id",
-        "Unknown",
+
+    result = (
+        "SUCCESS"
+        if success
+        else "FAILED"
     )
+
 
     add_history(
-        username,
-        device.upper(),
-        action,
-        (
-            "Sent"
-            if success
-            else "Failed"
-        ),
-        "Device Control",
-    )
 
-    if success:
+        login_id=
+            user["login_id"],
 
-        set_device_status(
-            device,
+        device=
+            DEVICE_NAMES[device],
+
+        action=
             action,
-        )
 
-        with mqtt_lock:
+        result=
+            result,
 
-            device_state[
-                device
-            ] = action
+        event_type=
+            "Device Command"
 
-    return jsonify(
-        {
-
-            "success":
-                success,
-
-            "device":
-                device,
-
-            "action":
-                action,
-
-            "mqtt_connected":
-                ensure_mqtt_connection(),
-
-            "mqtt_error":
-                mqtt_last_error,
-        }
     )
 
 
-# ============================================================
-# MQTT DEBUG API
-# ============================================================
+    if not success:
 
-@app.route(
-    "/api/mqtt"
-)
-@login_required
-def api_mqtt():
-
-    connected = (
-        ensure_mqtt_connection()
-    )
-
-    return jsonify(
-        {
-
-            "connected":
-                connected,
-
-            "mqtt_connected":
-                connected,
+        return jsonify({
 
             "error":
-                mqtt_last_error,
+                "MQTT command could not be published.",
 
-            "broker":
-                MQTT_BROKER,
+            "result":
+                result,
 
-            "port":
-                MQTT_PORT,
+        }), 500
 
-            "topics": {
 
-                "light":
-                    TOPIC_LIGHT,
+    return jsonify({
 
-                "fan":
-                    TOPIC_FAN,
+        "success":
+            True,
 
-                "geyser":
-                    TOPIC_GEYSER,
+        "device":
+            device,
 
-                "status":
-                    TOPIC_STATUS,
-            },
-        }
-    )
+        "action":
+            action,
+
+        "result":
+            result,
+
+        "message":
+            f"{DEVICE_NAMES[device]} command sent successfully."
+
+    })
 
 
 # ============================================================
 # HEALTH
 # ============================================================
 
-@app.route(
-    "/health"
-)
+@app.route("/health")
 def health():
 
-    connected = (
-        ensure_mqtt_connection()
-    )
+    return jsonify({
 
-    return jsonify(
-        {
+        "status":
+            "ok",
 
-            "status":
-                "ok",
+        "mqtt_connected":
+            mqtt_connected,
 
-            "mqtt_connected":
-                connected,
-        }
-    )
+    })
 
 
 # ============================================================
 # STARTUP
 # ============================================================
 
-init_db()
+create_admin_if_needed()
 
-try:
+load_latest_status()
 
-    start_mqtt()
+start_mqtt()
 
-except Exception as exc:
-
-    print(
-        "MQTT INITIALIZATION ERROR:",
-        type(exc).__name__,
-        str(exc),
-        flush=True,
-    )
-
-
-# ============================================================
-# LOCAL DEVELOPMENT
-# ============================================================
 
 if __name__ == "__main__":
 
     app.run(
         host="0.0.0.0",
-
         port=int(
             os.environ.get(
                 "PORT",
-                "5000",
+                "5000"
             )
         ),
-
-        debug=False,
+        debug=False
     )
