@@ -1,19 +1,18 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
 
     <meta
         name="viewport"
-        content="width=device-width, initial-scale=1"
+        content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Sign In | HomeIoT</title>
+    <title>Sign In | Home IoT Secure</title>
 
     <link
         rel="stylesheet"
-        href="{{ url_for('static', filename='style.css') }}?v=33"
+        href="{{ url_for('static', filename='style.css') }}"
     >
 </head>
 
@@ -25,23 +24,23 @@
 
             <!-- =================================================
                  BRAND
-            ================================================== -->
+                 ================================================= -->
 
             <div class="auth-brand">
 
-                <div class="brand-icon">
-                    ⌂
+                <div class="brand-mark">
+                    IoT
                 </div>
 
                 <div>
 
-                    <h1>
-                        HomeIoT
-                    </h1>
+                    <strong>
+                        Home IoT
+                    </strong>
 
-                    <p>
-                        Remote Control
-                    </p>
+                    <span>
+                        Secure Control
+                    </span>
 
                 </div>
 
@@ -49,21 +48,22 @@
 
 
             <!-- =================================================
-                 TITLE
-            ================================================== -->
+                 HEADER
+                 ================================================= -->
 
-            <div class="auth-heading">
+            <div class="auth-header">
 
-                <p class="eyebrow">
-                    SECURE ACCESS
-                </p>
+                <span class="page-eyebrow">
+                    REMOTE HOME CONTROL
+                </span>
 
-                <h2>
-                    Sign In
-                </h2>
+                <h1>
+                    Welcome back
+                </h1>
 
                 <p>
-                    Sign in to access your HomeIoT dashboard.
+                    Sign in to access your IoT dashboard
+                    and remotely control your appliances.
                 </p>
 
             </div>
@@ -71,9 +71,11 @@
 
             <!-- =================================================
                  FLASH MESSAGES
-            ================================================== -->
+                 ================================================= -->
 
-            {% with messages = get_flashed_messages(with_categories=true) %}
+            {% with messages = get_flashed_messages(
+                with_categories=true
+            ) %}
 
                 {% if messages %}
 
@@ -82,7 +84,12 @@
                         {% for category, message in messages %}
 
                             <div
-                                class="flash-message {{ category }}"
+                                class="flash-message
+                                {% if category == 'error' %}
+                                    flash-error
+                                {% else %}
+                                    flash-success
+                                {% endif %}"
                             >
                                 {{ message }}
                             </div>
@@ -97,23 +104,18 @@
 
 
             <!-- =================================================
-                 LOGIN FORM
-            ================================================== -->
+                 SIGN IN FORM
+                 ================================================= -->
 
             <form
-                method="post"
                 action="{{ url_for('signin') }}"
+                method="POST"
                 class="auth-form"
             >
 
-                <input
-                    type="hidden"
-                    name="csrf_token"
-                    value="{{ csrf_token }}"
-                >
+                <!-- LOGIN ID -->
 
-
-                <div class="form-group">
+                <div class="form-field">
 
                     <label for="login_id">
                         Email or Phone Number
@@ -132,7 +134,9 @@
                 </div>
 
 
-                <div class="form-group">
+                <!-- PASSWORD -->
+
+                <div class="form-field">
 
                     <label for="password">
                         Password
@@ -150,6 +154,8 @@
                 </div>
 
 
+                <!-- SUBMIT -->
+
                 <button
                     type="submit"
                     class="primary-button auth-submit"
@@ -161,50 +167,63 @@
 
 
             <!-- =================================================
-                 SIGN UP
-            ================================================== -->
+                 ACCOUNT STATUS NOTICE
+                 ================================================= -->
 
-            <div class="auth-footer">
+            <div class="auth-notice">
 
-                <p>
-                    Don't have an account?
-                </p>
+                <div class="auth-notice-icon">
+                    ℹ
+                </div>
 
-                <a href="{{ url_for('signup') }}">
-                    Create an account
-                </a>
+                <div>
+
+                    <strong>
+                        New account?
+                    </strong>
+
+                    <p>
+                        New registrations require administrator
+                        approval before you can sign in.
+                    </p>
+
+                </div>
 
             </div>
 
 
             <!-- =================================================
-                 APPROVAL NOTICE
-            ================================================== -->
+                 FOOTER
+                 ================================================= -->
 
-            <div class="auth-notice">
+            <div class="auth-footer">
 
-                <strong>
-                    New account?
-                </strong>
+                <span>
+                    Don't have an account?
+                </span>
 
-                <p>
-                    New registrations require administrator
-                    approval before you can sign in.
-                </p>
+                <a
+                    href="{{ url_for('signup') }}"
+                >
+                    Create Account
+                </a>
+
+            </div>
+
+
+            <div class="auth-home-link">
+
+                <a
+                    href="{{ url_for('home') }}"
+                >
+                    ← Back to Home
+                </a>
 
             </div>
 
         </section>
 
-
-        <footer class="auth-page-footer">
-
-            HomeIoT Remote Control • Flask + HiveMQ + ESP32
-
-        </footer>
-
     </main>
-
 
 </body>
 </html>
