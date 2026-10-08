@@ -1,1 +1,116 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Registration Pending | HomeIoT</title><link rel="stylesheet" href="{{ url_for('static',filename='style.css') }}?v=20"></head><body class="auth-page"><div class="auth-card"><div class="alert alert-success">Registration successful</div><h1>Approval required</h1><p>Your account <strong>{{ username }}</strong> has been created and is waiting for administrator approval. You can sign in after an administrator activates your account.</p><a class="btn btn-primary full" href="{{ url_for('login') }}">Go to Sign In</a></div></body></html>
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>Registration Submitted | HomeIoT</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}?v=35"
+    >
+</head>
+
+<body class="auth-page">
+
+    <main class="auth-container">
+
+        <section class="auth-card">
+
+            <div class="auth-brand">
+
+                <div class="brand-icon">
+                    ⌂
+                </div>
+
+                <div>
+
+                    <h1>
+                        HomeIoT
+                    </h1>
+
+                    <p>
+                        Remote Control
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="auth-heading">
+
+                <p class="eyebrow">
+                    REGISTRATION COMPLETE
+                </p>
+
+                <h2>
+                    Account Created
+                </h2>
+
+                <p>
+                    Your HomeIoT account has been created
+                    successfully.
+                </p>
+
+            </div>
+
+
+            <div class="auth-notice">
+
+                <strong>
+                    Administrator approval required
+                </strong>
+
+                <p>
+                    Your account is currently pending approval.
+                    You will be able to sign in after an
+                    administrator approves your account.
+                </p>
+
+            </div>
+
+
+            <div
+                class="hero-actions"
+                style="margin-top: 24px;"
+            >
+
+                <a
+                    href="{{ url_for('signin') }}"
+                    class="primary-button"
+                    style="width: 100%;"
+                >
+                    Go to Sign In
+                </a>
+
+            </div>
+
+
+            <div class="auth-footer">
+
+                <a href="{{ url_for('home') }}">
+                    Return to Home
+                </a>
+
+            </div>
+
+        </section>
+
+
+        <footer class="auth-page-footer">
+
+            HomeIoT Remote Control • Flask + HiveMQ + ESP32
+
+        </footer>
+
+    </main>
+
+</body>
+</html>
