@@ -2769,3 +2769,99 @@ footer {
         text-align: left;
     }
 }
+
+
+/* DEVICE PAGE: three appliance cards in one row */
+.devices {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 16px;
+    width: 100%;
+    margin: 0 0 24px;
+}
+
+.devices > .device-control-card {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: 255px;
+    padding: 22px;
+}
+
+.devices .device-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 13px;
+    min-width: 0;
+}
+
+.devices .device-info {
+    min-width: 0;
+}
+
+.devices .device-info h3 {
+    margin: 0 0 7px;
+}
+
+.devices .device-info p {
+    margin: 0 0 8px;
+}
+
+.devices .device-info .state {
+    display: inline-block;
+    font-weight: 800;
+}
+
+.devices .device-action {
+    margin-top: auto;
+    padding-top: 22px;
+}
+
+.devices .device-toggle {
+    width: 100%;
+}
+
+.status-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.status-summary-item {
+    min-width: 0;
+}
+
+#esp32Status.online {
+    color: #228653;
+}
+
+#esp32Status.offline {
+    color: #c23e4b;
+}
+
+.badge.online {
+    color: #228653;
+    background: #edf8f1;
+    border-color: #cdebd8;
+}
+
+.badge.offline {
+    color: #bd3545;
+    background: #fff0f1;
+    border-color: #f2cbd0;
+}
+
+@media (max-width: 1000px) {
+    .devices {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 650px) {
+    .devices,
+    .status-summary {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .devices > .device-control-card {
+        min-height: 220px;
+    }
+}
