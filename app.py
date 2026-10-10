@@ -1558,6 +1558,10 @@ def api_status():
     latest_status = load_latest_status()
     esp32 = get_esp32_status()
 
+    # This indicates that fresh ESP32 status messages are arriving.
+    # It is not a direct measurement of the broker connection itself.
+    status_feed_active = esp32.get("online", False)
+
     return jsonify(
         {
             "success": True,
@@ -1573,10 +1577,7 @@ def api_status():
             ),
 
             "mqtt": {
-                "connected": (
-                    mqtt_client is not None
-                    and mqtt_client.is_connected()
-                )
+                "connected": status_feed_active
             },
 
             "esp32": {
