@@ -1,0 +1,85 @@
+{#- ============================================================
+    Shared inline-SVG icon set (24x24, 1.75 stroke, currentColor).
+    Usage:  {% from "_icons.html" import icon %}  {{ icon("home") }}
+    Purely decorative: icons are aria-hidden; always pair with text
+    or an aria-label on the parent control.
+    ============================================================ -#}
+{% macro icon(name, size=20) -%}
+<svg class="icon icon-{{ name }}" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+{%- if name == "logo" -%}
+<path d="M3.5 11.2 12 4l8.5 7.2V19a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1z" transform="translate(0 .6)"/><path d="M8.6 15.4a4.9 4.9 0 0 1 6.8 0"/><path d="M10.6 17.6a2 2 0 0 1 2.8 0"/>
+{%- elif name == "home" -%}
+<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>
+{%- elif name == "dashboard" -%}
+<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>
+{%- elif name == "devices" -%}
+<rect x="2.5" y="7" width="19" height="10" rx="5"/><circle cx="16.5" cy="12" r="2.5"/>
+{%- elif name == "history" -%}
+<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+{%- elif name == "settings" -%}
+<path d="M4 6h9M19 6h1M4 12h3M13 12h7M4 18h11M20 18h0"/><circle cx="16" cy="6" r="2.2"/><circle cx="10" cy="12" r="2.2"/><circle cx="18" cy="18" r="2.2"/>
+{%- elif name == "admin" or name == "shield" -%}
+<path d="M12 3 4 6v6c0 4.5 3.2 8 8 9 4.8-1 8-4.5 8-9V6z"/><path d="m9 12 2 2 4-4"/>
+{%- elif name == "logout" -%}
+<path d="M9 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h4"/><path d="m16 8 4 4-4 4M20 12H9"/>
+{%- elif name == "menu" -%}
+<path d="M4 7h16M4 12h16M4 17h16"/>
+{%- elif name == "close" -%}
+<path d="M6 6l12 12M18 6 6 18"/>
+{%- elif name == "light" -%}
+<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>
+{%- elif name == "fan" -%}
+<circle cx="12" cy="12" r="1.6"/><path d="M12 10.4C12.3 6.6 11.5 3 9 3 6.8 3 7 6.2 9 8c.9.8 1.9 1.6 3 2.4z"/><path d="M12 10.4C12.3 6.6 11.5 3 9 3 6.8 3 7 6.2 9 8c.9.8 1.9 1.6 3 2.4z" transform="rotate(120 12 12)"/><path d="M12 10.4C12.3 6.6 11.5 3 9 3 6.8 3 7 6.2 9 8c.9.8 1.9 1.6 3 2.4z" transform="rotate(240 12 12)"/>
+{%- elif name == "geyser" -%}
+<rect x="6" y="2.5" width="12" height="15" rx="3"/><path d="M12 7.5c1.5 1.6 2.2 2.6 2.2 3.7a2.2 2.2 0 0 1-4.4 0c0-1.1.7-2.1 2.2-3.7z"/><path d="M9 21h6M12 17.5V21"/>
+{%- elif name == "thermometer" -%}
+<path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0z"/><path d="M12 9v7"/>
+{%- elif name == "droplet" -%}
+<path d="M12 3s6 6.2 6 10.5a6 6 0 0 1-12 0C6 9.2 12 3 12 3z"/>
+{%- elif name == "gas" -%}
+<path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 .3 1.2 1 2 2 2.2C10.5 8 11 5.5 12 3z"/>
+{%- elif name == "gauge" -%}
+<path d="M4 17a8 8 0 1 1 16 0"/><path d="m12 17 4-5"/><circle cx="12" cy="17" r="1"/>
+{%- elif name == "wifi" -%}
+<path d="M2.5 9a15 15 0 0 1 19 0M5.5 12.5a10.5 10.5 0 0 1 13 0M8.6 16a6 6 0 0 1 6.8 0"/><circle cx="12" cy="19.5" r=".8" fill="currentColor"/>
+{%- elif name == "mqtt" -%}
+<circle cx="12" cy="12" r="2"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"/>
+{%- elif name == "chip" -%}
+<rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>
+{%- elif name == "info" -%}
+<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>
+{%- elif name == "check" -%}
+<path d="m5 12.5 4.5 4.5L19 7.5"/>
+{%- elif name == "alert" -%}
+<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>
+{%- elif name == "arrow-right" -%}
+<path d="M5 12h14M13 6l6 6-6 6"/>
+{%- elif name == "browser" -%}
+<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M6.5 6.5h.01M9.5 6.5h.01"/>
+{%- elif name == "server" -%}
+<rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/>
+{%- elif name == "pulse" -%}
+<path d="M3 12h4.5l2.5-6 4 12 2.5-6H21"/>
+{%- elif name == "user" -%}
+<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>
+{%- elif name == "users" -%}
+<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.7a3.5 3.5 0 0 1 0 6.6M18 14a6.5 6.5 0 0 1 3.5 6"/>
+{%- elif name == "database" -%}
+<ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v13c0 1.7 3.6 3 8 3s8-1.3 8-3v-13M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>
+{%- elif name == "mail" -%}
+<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>
+{%- elif name == "lock" -%}
+<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>
+{%- elif name == "key" -%}
+<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3"/>
+{%- elif name == "filter" -%}
+<path d="M3 5h18l-7 8v6l-4-2v-4z"/>
+{%- elif name == "eye" -%}
+<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>
+{%- elif name == "power" -%}
+<path d="M12 3v9"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/>
+{%- elif name == "clock" -%}
+<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+{%- endif -%}
+</svg>
+{%- endmacro %}

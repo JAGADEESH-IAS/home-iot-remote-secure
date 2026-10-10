@@ -1,0 +1,29 @@
+{% extends "base_public.html" %}
+{% block title %}Verify Email{% endblock %}
+
+{% block body %}
+<main class="auth-container">
+    <section class="auth-card">
+
+        {% include "_auth_card.html" %}
+
+        <div class="auth-heading">
+            <p class="eyebrow">EMAIL VERIFICATION</p>
+            <h2>Verify your email</h2>
+            <p>Enter the six-digit code sent to {{ email }}. It expires in 10 minutes.</p>
+        </div>
+
+        {% include "_flash.html" %}
+
+        <form method="post" action="{{ url_for('verify_signup_otp') }}" class="auth-form">
+            <div class="form-group">
+                <label for="otp">Verification code</label>
+                <input id="otp" class="otp-input" name="otp" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code" required>
+            </div>
+            <button class="primary-button auth-submit" type="submit">Verify and create account</button>
+        </form>
+
+    </section>
+    <footer class="auth-page-footer">HomeIoT Remote Control • Flask + HiveMQ + ESP32</footer>
+</main>
+{% endblock %}

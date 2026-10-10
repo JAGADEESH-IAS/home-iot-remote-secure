@@ -1,0 +1,67 @@
+{% from "_icons.html" import icon %}
+{% set ep = request.endpoint %}
+<aside class="sidebar" id="sidebar" aria-label="Main navigation">
+
+    <div class="brand">
+        <div class="brand-icon">{{ icon("logo", 24) }}</div>
+        <div class="brand-text">
+            <h2>HomeIoT</h2>
+            <span>Remote Control</span>
+        </div>
+    </div>
+
+    <nav>
+        <a href="{{ url_for('home') }}" class="nav-item">
+            <span class="nav-icon">{{ icon("home") }}</span>
+            <span>Home</span>
+        </a>
+
+        <a href="{{ url_for('dashboard') }}" class="nav-item{% if ep == 'dashboard' %} active{% endif %}"{% if ep == 'dashboard' %} aria-current="page"{% endif %}>
+            <span class="nav-icon">{{ icon("dashboard") }}</span>
+            <span>Dashboard</span>
+        </a>
+
+        <a href="{{ url_for('devices') }}" class="nav-item{% if ep == 'devices' %} active{% endif %}"{% if ep == 'devices' %} aria-current="page"{% endif %}>
+            <span class="nav-icon">{{ icon("devices") }}</span>
+            <span>Devices</span>
+        </a>
+
+        <a href="{{ url_for('history') }}" class="nav-item{% if ep == 'history' %} active{% endif %}"{% if ep == 'history' %} aria-current="page"{% endif %}>
+            <span class="nav-icon">{{ icon("history") }}</span>
+            <span>History</span>
+        </a>
+
+        <a href="{{ url_for('settings') }}" class="nav-item{% if ep == 'settings' %} active{% endif %}"{% if ep == 'settings' %} aria-current="page"{% endif %}>
+            <span class="nav-icon">{{ icon("settings") }}</span>
+            <span>Settings</span>
+        </a>
+
+        {% if current_user and current_user.role == "ADMIN" %}
+        <a href="{{ url_for('admin_users') }}" class="nav-item{% if ep == 'admin_users' %} active{% endif %}"{% if ep == 'admin_users' %} aria-current="page"{% endif %}>
+            <span class="nav-icon">{{ icon("admin") }}</span>
+            <span>Admin</span>
+        </a>
+        {% endif %}
+    </nav>
+
+    <div class="sidebar-footer">
+
+        <div class="sidebar-user">
+            <div class="connection-dot" aria-hidden="true"></div>
+            <div class="sidebar-user-text">
+                <strong>{{ current_user.login_id }}</strong>
+                <span>{{ current_user.role }} · Approved</span>
+            </div>
+        </div>
+
+        <form class="logout-form" action="{{ url_for('logout') }}" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit">
+                {{ icon("logout", 18) }}
+                <span>Logout</span>
+            </button>
+        </form>
+
+    </div>
+
+</aside>

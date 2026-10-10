@@ -1,0 +1,84 @@
+{#- ============================================================
+    Authenticated application shell (sidebar + top bar).
+    Child templates fill: title, eyebrow, heading, subtitle,
+    topbar_extra, content, scripts.
+    Behaviour hooks preserved from the original pages:
+      #sidebar, .sidebar a, onclick="toggleSidebar()".
+    ============================================================ -#}
+{% from "_icons.html" import icon %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0A101D">
+    <title>{% block title %}{% endblock %} | HomeIoT</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=50">
+</head>
+<body class="app-body">
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<div class="app-shell">
+
+    {% include "_sidebar.html" %}
+
+    <div class="sidebar-scrim" onclick="toggleSidebar()" aria-hidden="true"></div>
+
+    <main class="main" id="main">
+
+        <header class="topbar">
+
+            <button
+                type="button"
+                class="mobile-menu"
+                onclick="toggleSidebar()"
+                aria-label="Open menu"
+                aria-controls="sidebar"
+            >
+                {{ icon("menu", 22) }}
+            </button>
+
+            <div class="topbar-title">
+                <p class="eyebrow">{% block eyebrow %}{% endblock %}</p>
+                <h1>{% block heading %}{% endblock %}</h1>
+                {% block subtitle_wrap %}
+                <p class="subtitle">{% block subtitle %}{% endblock %}</p>
+                {% endblock %}
+            </div>
+
+            <div class="topbar-extra">
+                {% block topbar_extra %}{% endblock %}
+            </div>
+
+        </header>
+
+        <div class="page-content">
+            {% block content %}{% endblock %}
+        </div>
+
+        <footer class="app-footer">
+            HomeIoT Remote Control • Flask + HiveMQ + ESP32
+        </footer>
+
+    </main>
+
+</div>
+
+{#- Fallback so the mobile menu also works on pages that do not load
+    static/app.js (History, Settings, Admin). When app.js is loaded it
+    redefines window.toggleSidebar with its own implementation. -#}
+<script>
+    if (typeof window.toggleSidebar !== "function") {
+        window.toggleSidebar = function () {
+            var sidebar = document.getElementById("sidebar");
+            if (sidebar) { sidebar.classList.toggle("open"); }
+        };
+    }
+</script>
+
+{% block scripts %}{% endblock %}
+
+</body>
+</html>

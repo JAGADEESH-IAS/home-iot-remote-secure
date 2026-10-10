@@ -1,0 +1,151 @@
+{% extends "base_app.html" %}
+{% from "_icons.html" import icon %}
+
+{% block title %}Devices{% endblock %}
+{% block eyebrow %}DEVICE CONTROL{% endblock %}
+{% block heading %}Devices{% endblock %}
+{% block subtitle %}Control your connected home appliances remotely.{% endblock %}
+
+{% block topbar_extra %}
+<div class="topbar-status">
+    <span class="system-status">
+        <span class="conn-label">MQTT status feed</span>
+        <span
+            id="mqttBadge"
+            class="badge status-chip {% if mqtt_connected %}online connected{% else %}offline disconnected{% endif %}"
+        >{% if mqtt_connected %}Connected{% else %}Disconnected{% endif %}</span>
+    </span>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<!-- ESP32 STATUS -->
+<section class="page-card">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">CONTROLLER STATUS</p>
+            <h2>ESP32</h2>
+        </div>
+    </div>
+
+    <div class="status-summary">
+
+        <div class="status-summary-item">
+            <span class="status-label">{{ icon("chip", 16) }} ESP32 Status</span>
+            <strong
+                id="esp32Status"
+                data-esp32-status
+                class="esp-status status-chip {% if esp32 and esp32.online %}online connected{% else %}offline disconnected{% endif %}"
+            >{% if esp32 and esp32.online %}Online{% else %}Offline{% endif %}</strong>
+        </div>
+
+        <div class="status-summary-item">
+            <span class="status-label">{{ icon("clock", 16) }} Last Seen</span>
+            <strong id="esp32LastSeen" data-esp32-last-seen class="mono">{% if esp32 and esp32.last_seen and esp32.last_seen != '-' %}{{ esp32.last_seen }}{% else %}Never{% endif %}</strong>
+        </div>
+
+    </div>
+</section>
+
+<!-- APPLIANCE CONTROLS -->
+<h2 class="section-title">Appliance Control</h2>
+
+<section class="devices">
+
+        <article class="card device-control-card">
+            <div class="device-top">
+                <div class="icon light-icon">{{ icon("light", 28) }}</div>
+                <div class="device-info">
+                    <h3>Light</h3>
+                    <p>Room lighting</p>
+                    <span
+                        id="lightState"
+                        data-device-status="light"
+                        class="state {% if device_state['light'] == 'ON' %}on{% else %}off{% endif %}"
+                    >{{ device_state['light'] }}</span>
+                </div>
+            </div>
+
+            <div class="device-action">
+                <button
+                    type="button"
+                    class="device-toggle {% if device_state['light'] == 'ON' %}is-on{% else %}is-off{% endif %}"
+                    id="lightButton"
+                    data-device="light"
+                    data-state="{{ device_state['light'] }}"
+                    onclick="toggleDevice('light')"
+                >{% if device_state['light'] == 'ON' %}Turn OFF{% else %}Turn ON{% endif %}</button>
+            </div>
+        </article>
+
+        <article class="card device-control-card">
+            <div class="device-top">
+                <div class="icon fan-icon">{{ icon("fan", 28) }}</div>
+                <div class="device-info">
+                    <h3>Fan</h3>
+                    <p>Cooling system</p>
+                    <span
+                        id="fanState"
+                        data-device-status="fan"
+                        class="state {% if device_state['fan'] == 'ON' %}on{% else %}off{% endif %}"
+                    >{{ device_state['fan'] }}</span>
+                </div>
+            </div>
+
+            <div class="device-action">
+                <button
+                    type="button"
+                    class="device-toggle {% if device_state['fan'] == 'ON' %}is-on{% else %}is-off{% endif %}"
+                    id="fanButton"
+                    data-device="fan"
+                    data-state="{{ device_state['fan'] }}"
+                    onclick="toggleDevice('fan')"
+                >{% if device_state['fan'] == 'ON' %}Turn OFF{% else %}Turn ON{% endif %}</button>
+            </div>
+        </article>
+
+        <article class="card device-control-card">
+            <div class="device-top">
+                <div class="icon geyser-icon">{{ icon("geyser", 28) }}</div>
+                <div class="device-info">
+                    <h3>Geyser</h3>
+                    <p>Water heating</p>
+                    <span
+                        id="geyserState"
+                        data-device-status="geyser"
+                        class="state {% if device_state['geyser'] == 'ON' %}on{% else %}off{% endif %}"
+                    >{{ device_state['geyser'] }}</span>
+                </div>
+            </div>
+
+            <div class="device-action">
+                <button
+                    type="button"
+                    class="device-toggle {% if device_state['geyser'] == 'ON' %}is-on{% else %}is-off{% endif %}"
+                    id="geyserButton"
+                    data-device="geyser"
+                    data-state="{{ device_state['geyser'] }}"
+                    onclick="toggleDevice('geyser')"
+                >{% if device_state['geyser'] == 'ON' %}Turn OFF{% else %}Turn ON{% endif %}</button>
+            </div>
+        </article>
+</section>
+
+<!-- COMMAND INFORMATION -->
+<section class="page-card device-control-note">
+    <span class="note-icon">{{ icon("info", 20) }}</span>
+    <div>
+        <strong>Device control</strong>
+        <p>Use the button beside each appliance to change its status. The dashboard is view-only.</p>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    window.CSRF_TOKEN = {{ csrf_token|tojson }};
+</script>
+<script src="{{ url_for('static', filename='app.js') }}?v=32"></script>
+{% endblock %}

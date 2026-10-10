@@ -1,0 +1,17 @@
+{#- Public / unauthenticated shell (landing + auth pages). -#}
+{% from "_icons.html" import icon %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0A101D">
+    <title>{% block title %}{% endblock %} | HomeIoT</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=50">
+</head>
+<body class="{% block body_class %}auth-page{% endblock %}">
+{% block body %}{% endblock %}
+{% block scripts %}{% endblock %}
+</body>
+</html>

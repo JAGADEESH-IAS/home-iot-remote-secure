@@ -1,0 +1,129 @@
+{% extends "base_app.html" %}
+{% from "_icons.html" import icon %}
+
+{% block title %}Settings{% endblock %}
+{% block eyebrow %}ACCOUNT{% endblock %}
+{% block heading %}Settings{% endblock %}
+{% block subtitle %}View your account and system information.{% endblock %}
+
+{% block content %}
+
+<!-- ACCOUNT INFORMATION -->
+<section class="page-card">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">ACCOUNT</p>
+            <h2>Account Information</h2>
+        </div>
+    </div>
+
+    <div class="settings-grid">
+        <div class="settings-item">
+            <span class="settings-icon">{{ icon("user", 20) }}</span>
+            <span class="settings-label">Login ID</span>
+            <strong>{{ current_user['login_id'] }}</strong>
+            <small>Email address or phone number used to sign in.</small>
+        </div>
+
+        <div class="settings-item">
+            <span class="settings-icon">{{ icon("admin", 20) }}</span>
+            <span class="settings-label">Account Role</span>
+            <strong>{{ current_user['role'] }}</strong>
+            <small>Your access level in the HomeIoT system.</small>
+        </div>
+
+        <div class="settings-item">
+            <span class="settings-icon">{{ icon("check", 20) }}</span>
+            <span class="settings-label">Account Status</span>
+            <strong class="status-text">{{ current_user['status'] }}</strong>
+            <small>Administrator approval status.</small>
+        </div>
+
+        <div class="settings-item">
+            <span class="settings-icon">{{ icon("lock", 20) }}</span>
+            <span class="settings-label">Authentication</span>
+            <strong>Password Protected</strong>
+            <small>Passwords are stored using secure hashing.</small>
+        </div>
+    </div>
+</section>
+
+<!-- SYSTEM INFORMATION -->
+<section class="page-card">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">SYSTEM</p>
+            <h2>IoT System Information</h2>
+        </div>
+    </div>
+
+    <div class="settings-grid">
+        <div class="settings-item">
+            <span class="settings-icon">{{ icon("server", 20) }}</span>
+            <span class="settings-label">Web Application</span>
+            <strong>Flask</strong>
+            <small>Remote web interface for the HomeIoT system.</small>
+        </div>
+
+        <div class="settings-item">
+            <span class="settings-icon">{{ icon("mqtt", 20) }}</span>
+            <span class="settings-label">MQTT Broker</span>
+            <strong>HiveMQ Cloud</strong>
+            <small>MQTT messaging service used for device communication.</small>
+        </div>
+
+        <div class="settings-item">
+            <span class="settings-icon">{{ icon("chip", 20) }}</span>
+            <span class="settings-label">Controller</span>
+            <strong>ESP32</strong>
+            <small>Receives appliance commands and sends device status and sensor readings.</small>
+        </div>
+
+        <div class="settings-item">
+            <span class="settings-icon">{{ icon("database", 20) }}</span>
+            <span class="settings-label">Persistent Storage</span>
+            <strong>Firebase Firestore</strong>
+            <small>Stores user accounts, status information and appliance history.</small>
+        </div>
+    </div>
+</section>
+
+<!-- SECURITY -->
+<section class="page-card">
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">SECURITY</p>
+            <h2>Security Information</h2>
+        </div>
+    </div>
+
+    <div class="security-notice">
+        <div class="security-icon">{{ icon("shield", 24) }}</div>
+        <div>
+            <strong>Account security is enabled</strong>
+            <p>
+                Your account requires authentication before accessing the
+                HomeIoT dashboard and appliance controls.
+            </p>
+            <p>
+                Device control endpoints are protected by authentication
+                and CSRF protection.
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- CURRENTLY NOT IMPLEMENTED -->
+<section class="page-card settings-note">
+    <div>
+        <p class="eyebrow">ACCOUNT CHANGES</p>
+        <h2>Account changes</h2>
+        <p>
+            Username or password changes and password-reset functionality
+            are not currently enabled.
+        </p>
+        <p>Contact the administrator if your account needs to be managed.</p>
+    </div>
+</section>
+
+{% endblock %}

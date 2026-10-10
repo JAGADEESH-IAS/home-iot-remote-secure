@@ -1,0 +1,204 @@
+{% extends "base_app.html" %}
+{% from "_icons.html" import icon %}
+{% from "_components.html" import mqtt_chip, esp_chip, state_pill %}
+
+{% block title %}Dashboard{% endblock %}
+{% block eyebrow %}HOME IOT SECURE{% endblock %}
+{% block heading %}Dashboard{% endblock %}
+{% block subtitle_wrap %}{% endblock %}
+
+{% block topbar_extra %}
+<div class="topbar-status">
+    <span class="system-status">
+        <span class="conn-label">MQTT status feed</span>
+        {{ mqtt_chip(mqtt_connected) }}
+    </span>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<!-- Page introduction -->
+<div class="page-intro">
+    <div>
+        <h2>Home Overview</h2>
+        <p>View the current status of your connected home appliances and sensors.</p>
+    </div>
+    <div class="view-only-badge">{{ icon("eye", 16) }} View Only</div>
+</div>
+
+<!-- CONNECTIVITY -->
+<section class="status-bar" aria-label="System connectivity">
+
+    <div class="status-bar-item">
+        <span class="status-icon">{{ icon("chip", 22) }}</span>
+        <div class="status-body">
+            <span class="status-label">ESP32</span>
+            <span class="status-value">{{ esp_chip(esp32.online) }}</span>
+            <span class="status-hint">Online while recent status messages arrive</span>
+        </div>
+    </div>
+
+    <div class="status-bar-item">
+        <span class="status-icon">{{ icon("clock", 22) }}</span>
+        <div class="status-body">
+            <span class="status-label">Last Seen</span>
+            <span class="status-value mono" data-esp32-last-seen>{{ esp32.last_seen }}</span>
+            <span class="status-hint">Latest ESP32 status message (IST)</span>
+        </div>
+    </div>
+
+    <div class="status-bar-item">
+        <span class="status-icon">{{ icon("mqtt", 22) }}</span>
+        <div class="status-body">
+            <span class="status-label">MQTT status feed</span>
+            <span class="status-value">{{ mqtt_chip(mqtt_connected) }}</span>
+            <span class="status-hint">Status messages received through HiveMQ</span>
+        </div>
+    </div>
+
+</section>
+
+<!-- APPLIANCES -->
+<section class="dashboard-section" aria-labelledby="appliancesHeading">
+
+    <div class="section-heading">
+        <div>
+            <span class="section-eyebrow">APPLIANCES</span>
+            <h3 id="appliancesHeading">Current Device Status</h3>
+        </div>
+        <a class="section-note section-link" href="{{ url_for('devices') }}">
+            Control available on Devices page {{ icon("arrow-right", 16) }}
+        </a>
+    </div>
+
+    <div class="device-grid">
+
+        <article class="device-card">
+            <div class="device-card-header">
+                <div class="device-icon light-icon">{{ icon("light", 26) }}</div>
+                <div class="device-card-title">
+                    <h4>Light</h4>
+                    <span>Living Area</span>
+                </div>
+            </div>
+            <div class="device-state-row">
+                <span class="device-state-label">Status</span>
+                {{ state_pill("light", status.devices.light) }}
+            </div>
+        </article>
+
+        <article class="device-card">
+            <div class="device-card-header">
+                <div class="device-icon fan-icon">{{ icon("fan", 26) }}</div>
+                <div class="device-card-title">
+                    <h4>Fan</h4>
+                    <span>Living Area</span>
+                </div>
+            </div>
+            <div class="device-state-row">
+                <span class="device-state-label">Status</span>
+                {{ state_pill("fan", status.devices.fan) }}
+            </div>
+        </article>
+
+        <article class="device-card">
+            <div class="device-card-header">
+                <div class="device-icon geyser-icon">{{ icon("geyser", 26) }}</div>
+                <div class="device-card-title">
+                    <h4>Geyser</h4>
+                    <span>Bathroom</span>
+                </div>
+            </div>
+            <div class="device-state-row">
+                <span class="device-state-label">Status</span>
+                {{ state_pill("geyser", status.devices.geyser) }}
+            </div>
+        </article>
+
+    </div>
+</section>
+
+<!-- SENSORS -->
+<section class="dashboard-section" aria-labelledby="sensorsHeading">
+
+    <div class="section-heading">
+        <div>
+            <span class="section-eyebrow">ESP32 SENSORS</span>
+            <h3 id="sensorsHeading">Current Readings</h3>
+        </div>
+        <span class="section-note">Updated from ESP32 status messages</span>
+    </div>
+
+    <div class="sensor-grid">
+
+        <article class="sensor-card">
+            <div class="sensor-icon temp">{{ icon("thermometer", 24) }}</div>
+            <div class="sensor-content">
+                <span class="sensor-label">Temperature</span>
+                <strong class="sensor-value" id="temperature">
+                    {% if status.sensors.temperature is not none %}
+                        {{ status.sensors.temperature }} °C
+                    {% else %}
+                        --
+                    {% endif %}
+                </strong>
+            </div>
+        </article>
+
+        <article class="sensor-card">
+            <div class="sensor-icon humidity">{{ icon("droplet", 24) }}</div>
+            <div class="sensor-content">
+                <span class="sensor-label">Humidity</span>
+                <strong class="sensor-value" id="humidity">
+                    {% if status.sensors.humidity is not none %}
+                        {{ status.sensors.humidity }} %
+                    {% else %}
+                        --
+                    {% endif %}
+                </strong>
+            </div>
+        </article>
+
+        <article class="sensor-card">
+            <div class="sensor-icon gas">{{ icon("gas", 24) }}</div>
+            <div class="sensor-content">
+                <span class="sensor-label">Gas Status</span>
+                <strong class="sensor-value" id="gas">{{ status.sensors.gas or "UNKNOWN" }}</strong>
+            </div>
+        </article>
+
+        <article class="sensor-card">
+            <div class="sensor-icon gauge">{{ icon("gauge", 24) }}</div>
+            <div class="sensor-content">
+                <span class="sensor-label">Gas Sensor Raw</span>
+                <strong class="sensor-value" id="gasRaw">
+                    {% if status.sensors.gas_raw is not none %}
+                        {{ status.sensors.gas_raw }}
+                    {% else %}
+                        --
+                    {% endif %}
+                </strong>
+            </div>
+        </article>
+
+    </div>
+</section>
+
+<!-- VIEW-ONLY NOTICE -->
+<section class="info-panel">
+    <div class="info-panel-icon">{{ icon("info", 22) }}</div>
+    <div>
+        <h4>Dashboard is view-only</h4>
+        <p>
+            Appliance control is available only on the Devices page.
+            This dashboard displays the latest state reported by the ESP32.
+        </p>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}

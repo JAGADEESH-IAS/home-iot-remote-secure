@@ -1,0 +1,257 @@
+{% extends "base_app.html" %}
+{% from "_icons.html" import icon %}
+
+{% block title %}User Management{% endblock %}
+{% block eyebrow %}ADMINISTRATION{% endblock %}
+{% block heading %}User Management{% endblock %}
+{% block subtitle %}Review and manage HomeIoT user accounts.{% endblock %}
+
+{% block content %}
+
+<!-- FLASH MESSAGES -->
+{% include "_flash.html" %}
+
+<!-- SUMMARY -->
+<section class="status-summary admin-summary">
+
+    <div class="status-summary-item">
+        <span class="status-label">{{ icon("users", 16) }} Total Users</span>
+        <strong>{{ users|length }}</strong>
+    </div>
+
+    <div class="status-summary-item">
+        <span class="status-label">{{ icon("clock", 16) }} Pending</span>
+        <strong>{{ users|selectattr('status', 'equalto', 'PENDING')|list|length }}</strong>
+    </div>
+
+    <div class="status-summary-item">
+        <span class="status-label">{{ icon("check", 16) }} Active</span>
+        <strong>{{ users|selectattr('status', 'equalto', 'ACTIVE')|list|length }}</strong>
+    </div>
+
+</section>
+
+<!-- USER TABLE -->
+<section class="page-card">
+
+    <div class="section-heading">
+        <div>
+            <p class="eyebrow">ACCOUNTS</p>
+            <h2>Registered Users</h2>
+        </div>
+    </div>
+
+    <div class="admin-table-wrapper">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Login ID</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+
+                    <tr>
+
+                        <td>
+
+                            <strong>
+                                {{ user['login_id'] }}
+                            </strong>
+
+                        </td>
+
+
+                        <td>
+
+                            <span class="role-badge">
+                                {{ user['role'] }}
+                            </span>
+
+                        </td>
+
+
+                        <td>
+
+                            {% if user['status'] == 'ACTIVE' %}
+
+                                <span class="user-status active">
+                                    ACTIVE
+                                </span>
+
+                            {% elif user['status'] == 'PENDING' %}
+
+                                <span class="user-status pending">
+                                    PENDING
+                                </span>
+
+                            {% else %}
+
+                                <span class="user-status">
+                                    {{ user['status'] }}
+                                </span>
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <td>
+
+                            {{ user['created_at_display']|default('—', true) }}
+
+                        </td>
+
+
+                        <td class="admin-actions">
+
+                            {% if user['status'] == 'PENDING' %}
+
+                                <form
+                                    method="post"
+                                    action="{{ url_for(
+                                        'admin_user_action',
+                                        user_id=user['id'],
+                                        action='approve'
+                                    ) }}"
+                                >
+
+                                    <input
+                                        type="hidden"
+                                        name="csrf_token"
+                                        value="{{ csrf_token }}"
+                                    >
+
+                                    <button
+                                        type="submit"
+                                        class="small-primary-button"
+                                    >
+                                        Approve
+                                    </button>
+
+                                </form>
+
+
+                                <form
+                                    method="post"
+                                    action="{{ url_for(
+                                        'admin_user_action',
+                                        user_id=user['id'],
+                                        action='reject'
+                                    ) }}"
+                                >
+
+                                    <input
+                                        type="hidden"
+                                        name="csrf_token"
+                                        value="{{ csrf_token }}"
+                                    >
+
+                                    <button
+                                        type="submit"
+                                        class="small-danger-button"
+                                    >
+                                        Reject
+                                    </button>
+
+                                </form>
+
+                            {% elif user['status'] == 'ACTIVE' and user['role'] != 'ADMIN' %}
+
+                                <form
+                                    method="post"
+                                    action="{{ url_for(
+                                        'admin_user_action',
+                                        user_id=user['id'],
+                                        action='reject'
+                                    ) }}"
+                                >
+
+                                    <input
+                                        type="hidden"
+                                        name="csrf_token"
+                                        value="{{ csrf_token }}"
+                                    >
+
+                                    <button
+                                        type="submit"
+                                        class="small-danger-button"
+                                    >
+                                        Disable
+                                    </button>
+
+                                </form>
+
+                            {% elif user['status'] == 'REJECTED' and user['role'] != 'ADMIN' %}
+
+                                <form
+                                    method="post"
+                                    action="{{ url_for(
+                                        'admin_user_action',
+                                        user_id=user['id'],
+                                        action='approve'
+                                    ) }}"
+                                >
+
+                                    <input
+                                        type="hidden"
+                                        name="csrf_token"
+                                        value="{{ csrf_token }}"
+                                    >
+
+                                    <button
+                                        type="submit"
+                                        class="small-primary-button"
+                                    >
+                                        Approve
+                                    </button>
+
+                                </form>
+
+                            {% else %}
+
+                                <span class="admin-protected">
+                                    Protected
+                                </span>
+
+                            {% endif %}
+
+                        </td>
+
+                    </tr>
+
+                {% else %}
+
+                    <tr>
+
+                        <td
+                            colspan="5"
+                            class="empty-history"
+                        >
+                            No users found.
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</section>
+
+<!-- ADMIN NOTICE -->
+<section class="page-card settings-note">
+    <div>
+        <p class="eyebrow">ADMIN ACCESS</p>
+        <h2>User approval</h2>
+        <p>New users remain pending until an administrator approves their account.</p>
+        <p>Administrator accounts are protected and cannot be disabled from this page.</p>
+    </div>
+</section>
+
+{% endblock %}
