@@ -1,0 +1,826 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>History | HomeIoT</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}?v=32"
+    >
+</head>
+
+<body>
+
+<button
+    class="mobile-menu"
+    onclick="toggleSidebar()"
+    aria-label="Open menu"
+>
+    ☰
+</button>
+
+
+<!-- =========================================================
+     SIDEBAR
+========================================================= -->
+
+<aside
+    class="sidebar"
+    id="sidebar"
+>
+
+    <div class="brand">
+
+        <div class="brand-icon">
+            ⌂
+        </div>
+
+        <div>
+            <h2>HomeIoT</h2>
+            <span>Remote Control</span>
+        </div>
+
+    </div>
+
+
+    <nav>
+
+        <a href="{{ url_for('home') }}">
+            🏠 &nbsp; Home
+        </a>
+
+        <a href="{{ url_for('dashboard') }}">
+            ▦ &nbsp; Dashboard
+        </a>
+
+        <a href="{{ url_for('devices') }}">
+            ◉ &nbsp; Devices
+        </a>
+
+        <a
+            href="{{ url_for('history') }}"
+            class="active"
+        >
+            ◷ &nbsp; History
+        </a>
+
+        <a href="{{ url_for('settings') }}">
+            ⚙ &nbsp; Settings
+        </a>
+
+        {% if current_user and current_user['role'] == 'ADMIN' %}
+
+        <a href="{{ url_for('admin_users') }}">
+            ♙ &nbsp; Admin
+        </a>
+
+        {% endif %}
+
+    </nav>
+
+
+    <div class="sidebar-footer">
+
+        <div class="sidebar-user">
+
+            <div class="connection-dot"></div>
+
+            <div>
+
+                <strong>
+                    {{ current_user['login_id'] }}
+                </strong>
+
+                <span>
+                    {{ current_user['role'] }}
+                    · Approved
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <form
+            class="logout-form"
+            method="post"
+            action="{{ url_for('logout') }}"
+        >
+
+            <input
+                type="hidden"
+                name="csrf_token"
+                value="{{ csrf_token }}"
+            >
+
+            <button type="submit">
+                ⇥ &nbsp; Logout
+            </button>
+
+        </form>
+
+    </div>
+
+</aside>
+
+
+<!-- =========================================================
+     MAIN
+========================================================= -->
+
+<main class="main">
+
+    <header class="topbar">
+
+        <div>
+
+            <p class="eyebrow">
+                ACTIVITY
+            </p>
+
+            <h1>
+                History
+            </h1>
+
+            <p class="subtitle">
+                Recent appliance control activity.
+            </p>
+
+        </div>
+
+    </header>
+
+
+    <!-- =====================================================
+         FILTERS
+    ====================================================== -->
+
+    <section class="page-card history-filters">
+
+        <div class="section-heading">
+
+            <div>
+
+                <p class="eyebrow">
+                    FILTER HISTORY
+                </p>
+
+                <h2>
+                    Find a specific event
+                </h2>
+
+            </div>
+
+        </div>
+
+
+        <div class="filter-grid">
+
+
+            <!-- Date / Time -->
+
+            <div class="filter-field">
+
+                <label for="historyDate">
+                    Date
+                </label>
+
+                <input
+                    type="date"
+                    id="historyDate"
+                >
+
+            </div>
+
+
+            <!-- User -->
+
+            <div class="filter-field">
+
+                <label for="historyUser">
+                    User
+                </label>
+
+                <select id="historyUser">
+
+                    <option value="">
+                        All Users
+                    </option>
+
+                    {% for row in history %}
+
+                        {% if row['user'] %}
+
+                        <option value="{{ row['user'] }}">
+                            {{ row['user'] }}
+                        </option>
+
+                        {% endif %}
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+
+            <!-- Device -->
+
+            <div class="filter-field">
+
+                <label for="historyDevice">
+                    Device
+                </label>
+
+                <select id="historyDevice">
+
+                    <option value="">
+                        All Devices
+                    </option>
+
+                    <option value="Light">
+                        Light
+                    </option>
+
+                    <option value="Fan">
+                        Fan
+                    </option>
+
+                    <option value="Geyser">
+                        Geyser
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <!-- Action -->
+
+            <div class="filter-field">
+
+                <label for="historyAction">
+                    Action
+                </label>
+
+                <select id="historyAction">
+
+                    <option value="">
+                        All Actions
+                    </option>
+
+                    <option value="ON">
+                        ON
+                    </option>
+
+                    <option value="OFF">
+                        OFF
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <!-- Event -->
+
+            <div class="filter-field">
+
+                <label for="historyEvent">
+                    Event
+                </label>
+
+                <select id="historyEvent">
+
+                    <option value="">
+                        All Events
+                    </option>
+
+                    <option value="Device Command">
+                        Device Command
+                    </option>
+
+                    <option value="System">
+                        System
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <!-- Result -->
+
+            <div class="filter-field">
+
+                <label for="historyResult">
+                    Result
+                </label>
+
+                <select id="historyResult">
+
+                    <option value="">
+                        All Results
+                    </option>
+
+                    <option value="SUCCESS">
+                        SUCCESS
+                    </option>
+
+                    <option value="FAILED">
+                        FAILED
+                    </option>
+
+                    <option value="PENDING">
+                        PENDING
+                    </option>
+
+                </select>
+
+            </div>
+
+        </div>
+
+
+        <div class="filter-actions">
+
+            <button
+                type="button"
+                class="secondary-button"
+                onclick="clearHistoryFilters()"
+            >
+                Clear Filters
+            </button>
+
+            <span id="historyCount">
+                {{ history|length }} record(s)
+            </span>
+
+        </div>
+
+    </section>
+
+
+    <!-- =====================================================
+         HISTORY TABLE
+    ====================================================== -->
+
+    <section class="page-card history-card">
+
+        <div class="section-heading">
+
+            <div>
+
+                <p class="eyebrow">
+                    RECENT CHANGES
+                </p>
+
+                <h2>
+                    Activity Log
+                </h2>
+
+            </div>
+
+        </div>
+
+
+        <div class="history-table-wrapper">
+
+            <table
+                class="history-table"
+                id="historyTable"
+            >
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            Date &amp; Time
+                        </th>
+
+                        <th>
+                            User
+                        </th>
+
+                        <th>
+                            Device
+                        </th>
+
+                        <th>
+                            Action
+                        </th>
+
+                        <th>
+                            Event
+                        </th>
+
+                        <th>
+                            Result
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                {% for row in history %}
+
+                    <tr
+                        class="history-row"
+                        data-date="{{ row['created_at'] }}"
+                        data-user="{{ row['user']|default('', true) }}"
+                        data-device="{{ row['device']|default('', true) }}"
+                        data-action="{{ row['action']|default('', true) }}"
+                        data-event="{{ row['event']|default('', true) }}"
+                        data-result="{{ row['result']|default('', true) }}"
+                    >
+
+                        <td class="history-time">
+
+                            <span class="history-ist-time">
+                                {{ row['created_at'] }}
+                            </span>
+
+                            <small>
+                                IST
+                            </small>
+
+                        </td>
+
+
+                        <td>
+                            {{ row['user']|default('—', true) }}
+                        </td>
+
+
+                        <td>
+                            {{ row['device']|default('—', true) }}
+                        </td>
+
+
+                        <td>
+
+                            {% if row['action'] == 'ON' %}
+
+                                <span class="history-action on">
+                                    ON
+                                </span>
+
+                            {% elif row['action'] == 'OFF' %}
+
+                                <span class="history-action off">
+                                    OFF
+                                </span>
+
+                            {% else %}
+
+                                {{ row['action']|default('—', true) }}
+
+                            {% endif %}
+
+                        </td>
+
+
+                        <td>
+                            {{ row['event']|default('—', true) }}
+                        </td>
+
+
+                        <td>
+
+                            {% set result =
+                                row['result']|default('SUCCESS', true)
+                            %}
+
+
+                            {% if result == 'SUCCESS' %}
+
+                                <span class="history-result success">
+                                    SUCCESS
+                                </span>
+
+                            {% elif result == 'FAILED' %}
+
+                                <span class="history-result failed">
+                                    FAILED
+                                </span>
+
+                            {% elif result == 'PENDING' %}
+
+                                <span class="history-result pending">
+                                    PENDING
+                                </span>
+
+                            {% else %}
+
+                                <span class="history-result">
+                                    {{ result }}
+                                </span>
+
+                            {% endif %}
+
+                        </td>
+
+                    </tr>
+
+                {% else %}
+
+                    <tr id="emptyHistoryRow">
+
+                        <td
+                            colspan="6"
+                            class="empty-history"
+                        >
+                            No history records found.
+                        </td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+
+    <footer>
+        HomeIoT Remote Control • Flask + HiveMQ + ESP32
+    </footer>
+
+</main>
+
+
+<script>
+
+    function normalize(value) {
+        return String(value || "")
+            .trim()
+            .toLowerCase();
+    }
+
+
+    function filterHistory() {
+
+        const date =
+            document.getElementById("historyDate").value;
+
+        const user =
+            normalize(
+                document.getElementById("historyUser").value
+            );
+
+        const device =
+            normalize(
+                document.getElementById("historyDevice").value
+            );
+
+        const action =
+            normalize(
+                document.getElementById("historyAction").value
+            );
+
+        const event =
+            normalize(
+                document.getElementById("historyEvent").value
+            );
+
+        const result =
+            normalize(
+                document.getElementById("historyResult").value
+            );
+
+
+        const rows =
+            document.querySelectorAll(".history-row");
+
+
+        let visibleCount = 0;
+
+
+        rows.forEach(function(row) {
+
+            const rowDate =
+                String(row.dataset.date || "");
+
+            const rowUser =
+                normalize(row.dataset.user);
+
+            const rowDevice =
+                normalize(row.dataset.device);
+
+            const rowAction =
+                normalize(row.dataset.action);
+
+            const rowEvent =
+                normalize(row.dataset.event);
+
+            const rowResult =
+                normalize(row.dataset.result);
+
+
+            /*
+             * Firestore history timestamps are supplied by
+             * the backend already formatted in IST.
+             *
+             * The first 10 characters are YYYY-MM-DD.
+             */
+
+            const rowDay =
+                rowDate.substring(0, 10);
+
+
+            const matchesDate =
+                !date || rowDay === date;
+
+            const matchesUser =
+                !user || rowUser === user;
+
+            const matchesDevice =
+                !device || rowDevice === device;
+
+            const matchesAction =
+                !action || rowAction === action;
+
+            const matchesEvent =
+                !event || rowEvent === event;
+
+            const matchesResult =
+                !result || rowResult === result;
+
+
+            const visible =
+                matchesDate &&
+                matchesUser &&
+                matchesDevice &&
+                matchesAction &&
+                matchesEvent &&
+                matchesResult;
+
+
+            row.style.display =
+                visible ? "" : "none";
+
+
+            if (visible) {
+                visibleCount++;
+            }
+
+        });
+
+
+        const count =
+            document.getElementById("historyCount");
+
+
+        if (count) {
+
+            count.textContent =
+                visibleCount +
+                (
+                    visibleCount === 1
+                        ? " record"
+                        : " records"
+                );
+
+        }
+
+
+        updateEmptyState(visibleCount);
+
+    }
+
+
+    function updateEmptyState(visibleCount) {
+
+        const tbody =
+            document.querySelector(
+                "#historyTable tbody"
+            );
+
+        if (!tbody) {
+            return;
+        }
+
+
+        let emptyRow =
+            document.getElementById(
+                "filteredEmptyHistoryRow"
+            );
+
+
+        if (visibleCount === 0) {
+
+            if (!emptyRow) {
+
+                emptyRow =
+                    document.createElement("tr");
+
+                emptyRow.id =
+                    "filteredEmptyHistoryRow";
+
+                emptyRow.innerHTML = `
+                    <td
+                        colspan="6"
+                        class="empty-history"
+                    >
+                        No matching history records found.
+                    </td>
+                `;
+
+                tbody.appendChild(emptyRow);
+
+            }
+
+        } else if (emptyRow) {
+
+            emptyRow.remove();
+
+        }
+
+    }
+
+
+    function clearHistoryFilters() {
+
+        document.getElementById(
+            "historyDate"
+        ).value = "";
+
+        document.getElementById(
+            "historyUser"
+        ).value = "";
+
+        document.getElementById(
+            "historyDevice"
+        ).value = "";
+
+        document.getElementById(
+            "historyAction"
+        ).value = "";
+
+        document.getElementById(
+            "historyEvent"
+        ).value = "";
+
+        document.getElementById(
+            "historyResult"
+        ).value = "";
+
+
+        filterHistory();
+
+    }
+
+
+    document.addEventListener(
+        "DOMContentLoaded",
+        function() {
+
+            [
+                "historyDate",
+                "historyUser",
+                "historyDevice",
+                "historyAction",
+                "historyEvent",
+                "historyResult"
+            ].forEach(function(id) {
+
+                const element =
+                    document.getElementById(id);
+
+                if (element) {
+
+                    element.addEventListener(
+                        "change",
+                        filterHistory
+                    );
+
+                }
+
+            });
+
+            filterHistory();
+
+        }
+    );
+
+</script>
+
+
+</body>
+</html>
