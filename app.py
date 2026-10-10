@@ -1469,13 +1469,24 @@ def dashboard():
 @app.route("/devices")
 @login_required
 def devices():
-
-    latest_status = load_latest_status()
+    latest_status = load_latest_status() or {}
     esp32 = get_esp32_status()
+
+    # devices.html expects device_state as a separate template variable.
+    device_state = latest_status.get("devices", {})
+    if not isinstance(device_state, dict):
+        device_state = {}
+
+    device_state = {
+        "light": str(device_state.get("light", "OFF")).upper(),
+        "fan": str(device_state.get("fan", "OFF")).upper(),
+        "geyser": str(device_state.get("geyser", "OFF")).upper(),
+    }
 
     return render_template(
         "devices.html",
         status=latest_status,
+        device_state=device_state,
         mqtt_connected=mqtt_connected,
         esp32=esp32,
     )
