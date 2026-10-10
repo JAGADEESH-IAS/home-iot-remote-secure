@@ -2324,3 +2324,448 @@ footer {
     }
 
 }
+
+
+
+/* ============================================================
+   DASHBOARD ALIGNMENT PATCH
+   Targets the class names used by templates/index.html.
+   ============================================================ */
+
+.app-shell {
+    min-height: 100vh;
+}
+
+.main-content {
+    min-height: 100vh;
+    margin-left: 245px;
+    padding: 30px 34px 40px;
+    width: calc(100% - 245px);
+    min-width: 0;
+}
+
+.main-content .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin: 0 0 26px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e5eaf2;
+}
+
+.topbar-title {
+    min-width: 0;
+}
+
+.topbar-title .page-eyebrow {
+    display: block;
+    margin-bottom: 5px;
+    color: #71809a;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: .13em;
+}
+
+.topbar-title h1 {
+    margin: 0;
+    color: #172033;
+    font-size: clamp(25px, 2.2vw, 32px);
+    line-height: 1.2;
+    font-weight: 800;
+}
+
+.topbar-status {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    max-width: 100%;
+}
+
+.system-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 13px;
+    border: 1px solid #e5eaf2;
+    border-radius: 999px;
+    background: #fff;
+    color: #536078;
+    font-size: 12px;
+    font-weight: 750;
+    white-space: nowrap;
+}
+
+.page-content {
+    width: 100%;
+    max-width: 1440px;
+    margin: 0 auto;
+    min-width: 0;
+}
+
+.page-intro {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin-bottom: 22px;
+}
+
+.page-intro h2 {
+    margin: 0 0 7px;
+    color: #172033;
+    font-size: 23px;
+    font-weight: 800;
+}
+
+.page-intro p {
+    max-width: 700px;
+    color: #758198;
+    font-size: 14px;
+}
+
+.view-only-badge {
+    flex: 0 0 auto;
+    padding: 7px 12px;
+    border: 1px solid #dce4f0;
+    border-radius: 999px;
+    background: #fff;
+    color: #68758b;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.status-bar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+}
+
+.status-bar-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+    padding: 16px 18px;
+    border: 1px solid #e5eaf2;
+    border-radius: 13px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(25, 35, 55, .025);
+}
+
+.status-bar-item .status-label {
+    margin: 0;
+    color: #7b879d;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.status-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: #536078;
+    font-size: 12px;
+    font-weight: 750;
+    text-align: right;
+}
+
+.status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    flex: 0 0 8px;
+    border-radius: 50%;
+    background: #a4adbb;
+}
+
+.status-dot.online {
+    background: #2fa66a;
+}
+
+.status-dot.offline {
+    background: #d14f5a;
+}
+
+.dashboard-section {
+    margin: 0 0 28px;
+    min-width: 0;
+}
+
+.dashboard-section .section-heading {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+}
+
+.section-eyebrow {
+    display: block;
+    margin-bottom: 5px;
+    color: #7b879d;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .12em;
+}
+
+.dashboard-section .section-heading h3 {
+    color: #172033;
+    font-size: 19px;
+    font-weight: 800;
+}
+
+.section-note {
+    color: #8a94a6;
+    font-size: 11px;
+    text-align: right;
+}
+
+.device-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.main-content .device-card {
+    min-width: 0;
+    padding: 20px;
+    border: 1px solid #e5eaf2;
+    border-radius: 15px;
+    background: #fff;
+    box-shadow: 0 3px 12px rgba(25, 35, 55, .035);
+}
+
+.device-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 13px;
+    margin-bottom: 22px;
+}
+
+.main-content .device-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 46px;
+    height: 46px;
+    flex: 0 0 46px;
+    border-radius: 12px;
+    background: #f2f5fa;
+    font-size: 21px;
+}
+
+.device-card-title {
+    min-width: 0;
+}
+
+.device-card-title h4 {
+    margin: 0 0 4px;
+    color: #1b263b;
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.device-card-title span {
+    color: #8490a4;
+    font-size: 12px;
+}
+
+.device-state-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding-top: 14px;
+    border-top: 1px solid #edf0f5;
+}
+
+.device-state-label {
+    color: #8792a5;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.main-content .device-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 27px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #f1f4f8;
+    color: #667287;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.main-content .device-state:has(.status-dot.online) {
+    background: #edf8f1;
+    color: #26784d;
+}
+
+.sensor-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.main-content .sensor-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+    padding: 19px;
+    border: 1px solid #e5eaf2;
+    border-radius: 15px;
+    background: #fff;
+    box-shadow: 0 3px 12px rgba(25, 35, 55, .035);
+}
+
+.sensor-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    border-radius: 12px;
+    background: #f2f5fa;
+    font-size: 20px;
+}
+
+.sensor-content {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 5px;
+}
+
+.sensor-label {
+    color: #7b879d;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.main-content .sensor-value {
+    overflow-wrap: anywhere;
+    color: #172033;
+    font-size: clamp(17px, 1.5vw, 22px);
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+.info-panel {
+    display: flex;
+    align-items: flex-start;
+    gap: 13px;
+    padding: 17px 19px;
+    border: 1px solid #dfe7f3;
+    border-radius: 13px;
+    background: #f9fbff;
+    margin-bottom: 12px;
+}
+
+.info-panel-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    flex: 0 0 28px;
+    border-radius: 50%;
+    background: #e9effa;
+    color: #516b9c;
+    font-weight: 800;
+}
+
+.info-panel h4 {
+    margin: 1px 0 5px;
+    color: #26344b;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.info-panel p {
+    color: #758198;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.mobile-menu-button {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    flex: 0 0 40px;
+    border: 1px solid #e1e6ef;
+    border-radius: 10px;
+    background: #fff;
+    color: #172033;
+    font-size: 19px;
+}
+
+@media (max-width: 1100px) {
+    .main-content {
+        padding: 26px 24px 34px;
+    }
+    .sensor-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    .main-content {
+        width: 100%;
+        margin-left: 0;
+        padding: 78px 18px 28px;
+    }
+    .mobile-menu-button {
+        display: inline-flex;
+    }
+    .main-content .topbar {
+        align-items: center;
+        justify-content: flex-start;
+        gap: 12px;
+    }
+    .topbar-status {
+        width: 100%;
+        justify-content: flex-start;
+        padding-left: 52px;
+    }
+    .status-bar {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+    .device-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 600px) {
+    .main-content {
+        padding-right: 14px;
+        padding-left: 14px;
+    }
+    .device-grid,
+    .sensor-grid {
+        grid-template-columns: 1fr;
+    }
+    .page-intro h2 {
+        font-size: 21px;
+    }
+    .section-note {
+        text-align: left;
+    }
+}
