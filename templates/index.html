@@ -12,7 +12,7 @@
 
     <link
         rel="stylesheet"
-        href="{{ url_for('static', filename='style.css') }}"
+        href="{{ url_for('static', filename='style.css') }}?v=37"
     >
 </head>
 
@@ -29,21 +29,21 @@
         id="sidebar"
     >
 
-        <div class="sidebar-brand">
+        <div class="brand">
 
-            <div class="brand-mark">
-                IoT
+            <div class="brand-icon">
+                ⌂
             </div>
 
-            <div class="brand-text">
-                <strong>Home IoT</strong>
-                <span>Secure Control</span>
+            <div>
+                <h2>HomeIoT</h2>
+                <span>Remote Control</span>
             </div>
 
         </div>
 
 
-        <nav class="sidebar-nav">
+        <nav>
 
             <a
                 href="{{ url_for('home') }}"
@@ -105,30 +105,22 @@
         </nav>
 
 
-        <div class="sidebar-bottom">
+        <div class="sidebar-footer">
 
             <div class="sidebar-user">
 
-                <div class="user-avatar">
-                    {{ current_user.login_id[0]|upper }}
-                </div>
+                <div class="connection-dot"></div>
 
-                <div class="sidebar-user-info">
-
-                    <strong>
-                        {{ current_user.login_id }}
-                    </strong>
-
-                    <span>
-                        {{ current_user.role }} · Approved
-                    </span>
-
+                <div>
+                    <strong>{{ current_user.login_id }}</strong>
+                    <span>{{ current_user.role }} · Approved</span>
                 </div>
 
             </div>
 
 
             <form
+                class="logout-form"
                 action="{{ url_for('logout') }}"
                 method="POST"
             >
@@ -139,11 +131,8 @@
                     value="{{ csrf_token }}"
                 >
 
-                <button
-                    type="submit"
-                    class="logout-button"
-                >
-                    Logout
+                <button type="submit">
+                    ⇥ &nbsp; Logout
                 </button>
 
             </form>
@@ -165,8 +154,8 @@
 
             <button
                 type="button"
-                class="mobile-menu-button"
-                id="mobileMenuButton"
+                class="mobile-menu"
+                onclick="toggleSidebar()"
                 aria-label="Open menu"
             >
                 ☰
