@@ -1,9 +1,9 @@
+
 <!doctype html>
 <html lang="en">
 
 <head>
     <meta charset="utf-8">
-
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1"
@@ -13,7 +13,7 @@
 
     <link
         rel="stylesheet"
-        href="{{ url_for('static', filename='style.css') }}?v=31"
+        href="{{ url_for('static', filename='style.css') }}?v=32"
     >
 </head>
 
@@ -27,32 +27,18 @@
     ☰
 </button>
 
-
-<!-- =========================================================
-     SIDEBAR
-========================================================= -->
-
-<aside
-    class="sidebar"
-    id="sidebar"
->
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
 
     <div class="brand">
-
-        <div class="brand-icon">
-            ⌂
-        </div>
-
+        <div class="brand-icon">⌂</div>
         <div>
             <h2>HomeIoT</h2>
             <span>Remote Control</span>
         </div>
-
     </div>
 
-
     <nav>
-
         <a href="{{ url_for('home') }}">
             🏠 &nbsp; Home
         </a>
@@ -61,10 +47,7 @@
             ▦ &nbsp; Dashboard
         </a>
 
-        <a
-            href="{{ url_for('devices') }}"
-            class="active"
-        >
+        <a href="{{ url_for('devices') }}" class="active">
             ◉ &nbsp; Devices
         </a>
 
@@ -77,44 +60,29 @@
         </a>
 
         {% if current_user and current_user['role'] == 'ADMIN' %}
-
         <a href="{{ url_for('admin_users') }}">
             ♙ &nbsp; Admin
         </a>
-
         {% endif %}
-
     </nav>
-
 
     <div class="sidebar-footer">
 
         <div class="sidebar-user">
-
             <div class="connection-dot"></div>
-
             <div>
-
-                <strong>
-                    {{ current_user['login_id'] }}
-                </strong>
-
+                <strong>{{ current_user['login_id'] }}</strong>
                 <span>
-                    {{ current_user['role'] }}
-                    · Approved
+                    {{ current_user['role'] }} · Approved
                 </span>
-
             </div>
-
         </div>
-
 
         <form
             class="logout-form"
             method="post"
             action="{{ url_for('logout') }}"
         >
-
             <input
                 type="hidden"
                 name="csrf_token"
@@ -124,89 +92,50 @@
             <button type="submit">
                 ⇥ &nbsp; Logout
             </button>
-
         </form>
 
     </div>
 
 </aside>
 
-
-<!-- =========================================================
-     MAIN
-========================================================= -->
-
+<!-- MAIN CONTENT -->
 <main class="main">
 
-
-    <!-- =====================================================
-         HEADER
-    ====================================================== -->
-
+    <!-- HEADER -->
     <header class="topbar">
 
         <div>
+            <p class="eyebrow">DEVICE CONTROL</p>
 
-            <p class="eyebrow">
-                DEVICE CONTROL
-            </p>
-
-            <h1>
-                Devices
-            </h1>
+            <h1>Devices</h1>
 
             <p class="subtitle">
                 Control your connected home appliances remotely.
             </p>
-
         </div>
-
 
         <div
             id="mqttBadge"
-            class="
-                badge
-                {% if mqtt_connected %}
-                    online
-                {% else %}
-                    offline
-                {% endif %}
-            "
+            class="badge {% if mqtt_connected %}online{% else %}offline{% endif %}"
         >
-
             {% if mqtt_connected %}
                 ● MQTT Connected
             {% else %}
                 ● MQTT Offline
             {% endif %}
-
         </div>
 
     </header>
 
-
-    <!-- =====================================================
-         ESP32 STATUS
-    ====================================================== -->
-
+    <!-- ESP32 STATUS -->
     <section class="page-card">
 
         <div class="section-heading">
-
             <div>
-
-                <p class="eyebrow">
-                    CONTROLLER STATUS
-                </p>
-
-                <h2>
-                    ESP32
-                </h2>
-
+                <p class="eyebrow">CONTROLLER STATUS</p>
+                <h2>ESP32</h2>
             </div>
-
         </div>
-
 
         <div class="status-summary">
 
@@ -218,26 +147,16 @@
 
                 <strong
                     id="esp32Status"
-                    class="
-                        esp-status
-                        {% if esp32 and esp32.online %}
-                            online
-                        {% else %}
-                            offline
-                        {% endif %}
-                    "
+                    class="esp-status {% if esp32 and esp32.online %}online{% else %}offline{% endif %}"
                 >
-
                     {% if esp32 and esp32.online %}
                         ● Online
                     {% else %}
                         ● Offline
                     {% endif %}
-
                 </strong>
 
             </div>
-
 
             <div class="status-summary-item">
 
@@ -246,13 +165,11 @@
                 </span>
 
                 <strong id="esp32LastSeen">
-
-                    {% if esp32 and esp32.last_seen_display %}
-                        {{ esp32.last_seen_display }} IST
+                    {% if esp32 and esp32.last_seen and esp32.last_seen != '-' %}
+                        {{ esp32.last_seen }}
                     {% else %}
                         Never
                     {% endif %}
-
                 </strong>
 
             </div>
@@ -261,59 +178,31 @@
 
     </section>
 
-
-    <!-- =====================================================
-         DEVICE CONTROL
-    ====================================================== -->
-
-    <h2 class="section-title">
-        Appliance Control
-    </h2>
-
+    <!-- APPLIANCE CONTROLS -->
+    <h2 class="section-title">Appliance Control</h2>
 
     <section class="devices">
 
-
-        <!-- =================================================
-             LIGHT
-        ================================================== -->
-
+        <!-- LIGHT -->
         <article class="card device-control-card">
 
             <div class="device-top">
 
-                <div class="icon">
-                    💡
-                </div>
+                <div class="icon">💡</div>
 
                 <div class="device-info">
-
-                    <h3>
-                        Light
-                    </h3>
-
-                    <p>
-                        Room lighting
-                    </p>
+                    <h3>Light</h3>
+                    <p>Room lighting</p>
 
                     <span
                         id="lightState"
-                        class="
-                            state
-                            {% if device_state['light'] == 'ON' %}
-                                on
-                            {% else %}
-                                off
-                            {% endif %}
-                        "
+                        class="state {% if device_state['light'] == 'ON' %}on{% else %}off{% endif %}"
                     >
                         {{ device_state['light'] }}
                     </span>
-
                 </div>
 
             </div>
-
 
             <div class="device-action">
 
@@ -325,60 +214,37 @@
                     data-state="{{ device_state['light'] }}"
                     onclick="toggleDevice('light')"
                 >
-
                     {% if device_state['light'] == 'ON' %}
                         Turn OFF
                     {% else %}
                         Turn ON
                     {% endif %}
-
                 </button>
 
             </div>
 
         </article>
 
-
-        <!-- =================================================
-             FAN
-        ================================================== -->
-
+        <!-- FAN -->
         <article class="card device-control-card">
 
             <div class="device-top">
 
-                <div class="icon">
-                    🌀
-                </div>
+                <div class="icon">🌀</div>
 
                 <div class="device-info">
-
-                    <h3>
-                        Fan
-                    </h3>
-
-                    <p>
-                        Cooling system
-                    </p>
+                    <h3>Fan</h3>
+                    <p>Cooling system</p>
 
                     <span
                         id="fanState"
-                        class="
-                            state
-                            {% if device_state['fan'] == 'ON' %}
-                                on
-                            {% else %}
-                                off
-                            {% endif %}
-                        "
+                        class="state {% if device_state['fan'] == 'ON' %}on{% else %}off{% endif %}"
                     >
                         {{ device_state['fan'] }}
                     </span>
-
                 </div>
 
             </div>
-
 
             <div class="device-action">
 
@@ -390,60 +256,37 @@
                     data-state="{{ device_state['fan'] }}"
                     onclick="toggleDevice('fan')"
                 >
-
                     {% if device_state['fan'] == 'ON' %}
                         Turn OFF
                     {% else %}
                         Turn ON
                     {% endif %}
-
                 </button>
 
             </div>
 
         </article>
 
-
-        <!-- =================================================
-             GEYSER
-        ================================================== -->
-
+        <!-- GEYSER -->
         <article class="card device-control-card">
 
             <div class="device-top">
 
-                <div class="icon">
-                    ♨️
-                </div>
+                <div class="icon">♨️</div>
 
                 <div class="device-info">
-
-                    <h3>
-                        Geyser
-                    </h3>
-
-                    <p>
-                        Water heating
-                    </p>
+                    <h3>Geyser</h3>
+                    <p>Water heating</p>
 
                     <span
                         id="geyserState"
-                        class="
-                            state
-                            {% if device_state['geyser'] == 'ON' %}
-                                on
-                            {% else %}
-                                off
-                            {% endif %}
-                        "
+                        class="state {% if device_state['geyser'] == 'ON' %}on{% else %}off{% endif %}"
                     >
                         {{ device_state['geyser'] }}
                     </span>
-
                 </div>
 
             </div>
-
 
             <div class="device-action">
 
@@ -455,32 +298,23 @@
                     data-state="{{ device_state['geyser'] }}"
                     onclick="toggleDevice('geyser')"
                 >
-
                     {% if device_state['geyser'] == 'ON' %}
                         Turn OFF
                     {% else %}
                         Turn ON
                     {% endif %}
-
                 </button>
 
             </div>
 
         </article>
 
-
     </section>
 
-
-    <!-- =====================================================
-         COMMAND INFORMATION
-    ====================================================== -->
-
+    <!-- COMMAND INFORMATION -->
     <section class="page-card device-control-note">
 
-        <strong>
-            Device control
-        </strong>
+        <strong>Device control</strong>
 
         <p>
             Use the button beside each appliance to change its
@@ -489,31 +323,20 @@
 
     </section>
 
-
-    <!-- =====================================================
-         FOOTER
-    ====================================================== -->
-
+    <!-- FOOTER -->
     <footer>
         HomeIoT Remote Control • Flask + HiveMQ + ESP32
     </footer>
 
-
 </main>
 
-
 <script>
-
-    window.CSRF_TOKEN =
-        {{ csrf_token|tojson }};
-
+    window.CSRF_TOKEN = {{ csrf_token|tojson }};
 </script>
 
-
 <script
-    src="{{ url_for('static', filename='app.js') }}?v=31"
+    src="{{ url_for('static', filename='app.js') }}?v=32"
 ></script>
-
 
 </body>
 </html>
