@@ -1,3 +1,4 @@
+
 "use strict";
 
 /*
@@ -22,9 +23,7 @@
  * ============================================================
  */
 
-
 const HomeIoT = {
-
     state: {
         devices: {
             light: "OFF",
@@ -49,7 +48,6 @@ const HomeIoT = {
         }
     },
 
-
     /*
      * --------------------------------------------------------
      * Utility
@@ -57,7 +55,6 @@ const HomeIoT = {
      */
 
     escapeHtml(value) {
-
         if (value === null || value === undefined) {
             return "";
         }
@@ -68,27 +65,19 @@ const HomeIoT = {
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
-
     },
-
 
     getElement(id) {
-
         return document.getElementById(id);
-
     },
 
-
     setText(id, value) {
-
         const element = this.getElement(id);
 
         if (element) {
             element.textContent = value;
         }
-
     },
-
 
     /*
      * --------------------------------------------------------
@@ -97,23 +86,17 @@ const HomeIoT = {
      */
 
     toggleSidebar() {
-
-        const sidebar =
-            this.getElement("sidebar");
+        const sidebar = this.getElement("sidebar");
 
         if (!sidebar) {
             return;
         }
 
         sidebar.classList.toggle("open");
-
     },
 
-
     closeSidebarOnNavigation() {
-
-        const sidebar =
-            this.getElement("sidebar");
+        const sidebar = this.getElement("sidebar");
 
         if (!sidebar) {
             return;
@@ -122,9 +105,7 @@ const HomeIoT = {
         if (window.innerWidth <= 900) {
             sidebar.classList.remove("open");
         }
-
     },
-
 
     /*
      * --------------------------------------------------------
@@ -133,31 +114,24 @@ const HomeIoT = {
      */
 
     getCsrfToken() {
-
-        const element =
-            document.querySelector(
-                'input[name="csrf_token"]'
-            );
+        const element = document.querySelector(
+            'input[name="csrf_token"]'
+        );
 
         if (element) {
             return element.value;
         }
 
-
-        const meta =
-            document.querySelector(
-                'meta[name="csrf-token"]'
-            );
+        const meta = document.querySelector(
+            'meta[name="csrf-token"]'
+        );
 
         if (meta) {
             return meta.getAttribute("content");
         }
 
-
         return "";
-
     },
-
 
     /*
      * --------------------------------------------------------
@@ -166,106 +140,72 @@ const HomeIoT = {
      */
 
     async getStatus() {
-
         try {
-
-            const response =
-                await fetch(
-                    "/api/status",
-                    {
-                        method: "GET",
-                        headers: {
-                            "Accept": "application/json"
-                        },
-                        cache: "no-store"
-                    }
-                );
-
+            const response = await fetch(
+                "/api/status",
+                {
+                    method: "GET",
+                    headers: {
+                        "Accept": "application/json"
+                    },
+                    cache: "no-store"
+                }
+            );
 
             if (!response.ok) {
-
-                throw new Error(
-                    "Status request failed"
-                );
-
+                throw new Error("Status request failed");
             }
 
-
-            const data =
-                await response.json();
-
+            const data = await response.json();
 
             this.updateState(data);
-
             this.updateDashboard();
-
             this.updateDevices();
-
             this.updateConnectionIndicators();
 
         } catch (error) {
-
             console.error(
                 "HomeIoT status error:",
                 error
             );
-
         }
-
     },
-
 
     async sendDeviceCommand(
         device,
         action,
         button
     ) {
-
         if (!device || !action) {
             return;
         }
 
-
         if (button) {
-
             button.disabled = true;
 
             button.dataset.originalText =
                 button.textContent;
 
-            button.textContent =
-                "Sending...";
-
+            button.textContent = "Sending...";
         }
 
-
         try {
+            const csrfToken = this.getCsrfToken();
 
-            const csrfToken =
-                this.getCsrfToken();
+            const response = await fetch(
+                `/api/device/${encodeURIComponent(device)}/${encodeURIComponent(action)}`,
+                {
+                    method: "POST",
 
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                        "X-CSRF-Token": csrfToken
+                    },
 
-            const response =
-                await fetch(
-                    `/api/device/${encodeURIComponent(device)}/${encodeURIComponent(action)}`,
-                    {
-                        method: "POST",
-
-                        headers: {
-                            "Content-Type":
-                                "application/json",
-
-                            "Accept":
-                                "application/json",
-
-                            "X-CSRF-Token":
-                                csrfToken
-                        },
-
-                        body: JSON.stringify({})
-                    }
-                );
-
+                    body: JSON.stringify({})
+                }
+            );
 
             let data = {};
 
@@ -275,24 +215,17 @@ const HomeIoT = {
                 data = {};
             }
 
-
             if (!response.ok) {
-
                 throw new Error(
                     data.error ||
                     data.message ||
                     "Unable to send command"
                 );
-
             }
-
 
             /*
              * Do not permanently change the device state here.
-             *
              * The actual state is refreshed from /api/status.
-             * This prevents the UI from claiming that the ESP32
-             * changed state when only the MQTT command was sent.
              */
 
             this.showCommandMessage(
@@ -301,10 +234,8 @@ const HomeIoT = {
                 "success"
             );
 
-
             /*
-             * Give the ESP32 a short opportunity to process
-             * the MQTT command and publish its status.
+             * Give the ESP32 time to process the command.
              */
 
             setTimeout(
@@ -312,20 +243,16 @@ const HomeIoT = {
                 700
             );
 
-
             setTimeout(
                 () => this.getStatus(),
                 1800
             );
 
-
         } catch (error) {
-
             console.error(
                 "Device command error:",
                 error
             );
-
 
             this.showCommandMessage(
                 error.message ||
@@ -334,35 +261,24 @@ const HomeIoT = {
             );
 
         } finally {
-
             if (button) {
-
                 setTimeout(
                     () => {
-
                         button.disabled = false;
 
                         const currentState =
-                            this.state.devices[
-                                device
-                            ] || "OFF";
-
+                            this.state.devices[device] || "OFF";
 
                         button.textContent =
                             currentState === "ON"
                                 ? "Turn OFF"
                                 : "Turn ON";
-
                     },
                     1200
                 );
-
             }
-
         }
-
     },
-
 
     /*
      * --------------------------------------------------------
@@ -371,47 +287,39 @@ const HomeIoT = {
      */
 
     updateState(data) {
-
         if (!data || typeof data !== "object") {
             return;
         }
 
-
         if (data.devices) {
-
             this.state.devices = {
                 ...this.state.devices,
                 ...data.devices
             };
-
         }
 
-
         if (data.sensors) {
-
             this.state.sensors = {
                 ...this.state.sensors,
                 ...data.sensors
             };
-
         }
 
+        /*
+         * FIX: The Flask API returns data.mqtt.connected,
+         * not data.mqtt_connected.
+         */
 
         this.state.mqtt.connected =
-            data.mqtt_connected === true;
-
+            data.mqtt?.connected === true;
 
         if (data.esp32) {
-
             this.state.esp32 = {
                 ...this.state.esp32,
                 ...data.esp32
             };
-
         }
-
     },
-
 
     /*
      * --------------------------------------------------------
@@ -420,7 +328,6 @@ const HomeIoT = {
      */
 
     updateDashboard() {
-
         this.updateDeviceStatus(
             "light",
             this.state.devices.light
@@ -436,10 +343,7 @@ const HomeIoT = {
             this.state.devices.geyser
         );
 
-
-        const sensors =
-            this.state.sensors;
-
+        const sensors = this.state.sensors;
 
         /*
          * Temperature
@@ -449,21 +353,13 @@ const HomeIoT = {
             sensors.temperature !== null &&
             sensors.temperature !== undefined
         ) {
-
             this.setText(
                 "temperature",
                 `${sensors.temperature} °C`
             );
-
         } else {
-
-            this.setText(
-                "temperature",
-                "--"
-            );
-
+            this.setText("temperature", "--");
         }
-
 
         /*
          * Humidity
@@ -473,21 +369,13 @@ const HomeIoT = {
             sensors.humidity !== null &&
             sensors.humidity !== undefined
         ) {
-
             this.setText(
                 "humidity",
                 `${sensors.humidity} %`
             );
-
         } else {
-
-            this.setText(
-                "humidity",
-                "--"
-            );
-
+            this.setText("humidity", "--");
         }
-
 
         /*
          * Gas
@@ -498,7 +386,6 @@ const HomeIoT = {
             sensors.gas || "--"
         );
 
-
         /*
          * Raw gas value, if displayed.
          */
@@ -507,16 +394,12 @@ const HomeIoT = {
             sensors.gas_raw !== null &&
             sensors.gas_raw !== undefined
         ) {
-
             this.setText(
                 "gasRaw",
                 sensors.gas_raw
             );
-
         }
-
     },
-
 
     /*
      * --------------------------------------------------------
@@ -524,49 +407,29 @@ const HomeIoT = {
      * --------------------------------------------------------
      */
 
-    updateDeviceStatus(
-        device,
-        status
-    ) {
-
+    updateDeviceStatus(device, status) {
         const normalized =
-            String(status || "OFF")
-                .toUpperCase();
+            String(status || "OFF").toUpperCase();
 
-
-        const elements =
-            document.querySelectorAll(
-                `[data-device-status="${device}"]`
-            );
-
-
-        elements.forEach(
-            element => {
-
-                element.textContent =
-                    normalized;
-
-                element.classList.remove(
-                    "on",
-                    "off"
-                );
-
-
-                if (normalized === "ON") {
-
-                    element.classList.add("on");
-
-                } else {
-
-                    element.classList.add("off");
-
-                }
-
-            }
+        const elements = document.querySelectorAll(
+            `[data-device-status="${device}"]`
         );
 
-    },
+        elements.forEach(element => {
+            element.textContent = normalized;
 
+            element.classList.remove(
+                "on",
+                "off"
+            );
+
+            if (normalized === "ON") {
+                element.classList.add("on");
+            } else {
+                element.classList.add("off");
+            }
+        });
+    },
 
     /*
      * --------------------------------------------------------
@@ -575,88 +438,60 @@ const HomeIoT = {
      */
 
     updateDevices() {
+        const devices = [
+            "light",
+            "fan",
+            "geyser"
+        ];
 
-        const devices =
-            [
-                "light",
-                "fan",
-                "geyser"
-            ];
+        devices.forEach(device => {
+            const state =
+                String(
+                    this.state.devices[device] || "OFF"
+                ).toUpperCase();
 
+            /*
+             * Device status labels
+             */
 
-        devices.forEach(
-            device => {
+            this.updateDeviceStatus(
+                device,
+                state
+            );
 
-                const state =
-                    String(
-                        this.state.devices[device] ||
-                        "OFF"
-                    ).toUpperCase();
+            /*
+             * Exactly one button per device.
+             * OFF -> Turn ON
+             * ON  -> Turn OFF
+             */
 
+            const button = this.getElement(
+                `${device}Button`
+            );
 
-                /*
-                 * Device status labels
-                 */
-
-                this.updateDeviceStatus(
-                    device,
-                    state
-                );
-
-
-                /*
-                 * Exactly one button per device.
-                 *
-                 * OFF -> Turn ON
-                 * ON  -> Turn OFF
-                 */
-
-                const button =
-                    this.getElement(
-                        `${device}Button`
-                    );
-
-
-                if (!button) {
-                    return;
-                }
-
-
-                button.textContent =
-                    state === "ON"
-                        ? "Turn OFF"
-                        : "Turn ON";
-
-
-                button.classList.remove(
-                    "is-on",
-                    "is-off"
-                );
-
-
-                if (state === "ON") {
-
-                    button.classList.add(
-                        "is-on"
-                    );
-
-                } else {
-
-                    button.classList.add(
-                        "is-off"
-                    );
-
-                }
-
-
-                button.dataset.state =
-                    state;
-
+            if (!button) {
+                return;
             }
-        );
 
+            button.textContent =
+                state === "ON"
+                    ? "Turn OFF"
+                    : "Turn ON";
+
+            button.classList.remove(
+                "is-on",
+                "is-off"
+            );
+
+            if (state === "ON") {
+                button.classList.add("is-on");
+            } else {
+                button.classList.add("is-off");
+            }
+
+            button.dataset.state = state;
+        });
     },
-
 
     /*
      * --------------------------------------------------------
@@ -665,7 +500,6 @@ const HomeIoT = {
      */
 
     toggleDevice(device) {
-
         if (
             ![
                 "light",
@@ -673,44 +507,34 @@ const HomeIoT = {
                 "geyser"
             ].includes(device)
         ) {
-
             console.error(
                 "Invalid device:",
                 device
             );
 
             return;
-
         }
-
 
         const currentState =
             String(
-                this.state.devices[device] ||
-                "OFF"
+                this.state.devices[device] || "OFF"
             ).toUpperCase();
-
 
         const action =
             currentState === "ON"
                 ? "OFF"
                 : "ON";
 
-
-        const button =
-            this.getElement(
-                `${device}Button`
-            );
-
+        const button = this.getElement(
+            `${device}Button`
+        );
 
         this.sendDeviceCommand(
             device,
             action,
             button
         );
-
     },
-
 
     /*
      * --------------------------------------------------------
@@ -719,45 +543,45 @@ const HomeIoT = {
      */
 
     updateConnectionIndicators() {
-
         const mqttConnected =
-            this.state.mqtt.connected;
-
+            this.state.mqtt.connected === true;
 
         /*
          * MQTT status
+         *
+         * Include #mqttBadge because the Devices page may
+         * use that ID instead of data-mqtt-status.
          */
 
-        const mqttElements =
-            document.querySelectorAll(
-                "[data-mqtt-status]"
-            );
-
-
-        mqttElements.forEach(
-            element => {
-
-                element.textContent =
-                    mqttConnected
-                        ? "Connected"
-                        : "Disconnected";
-
-
-                element.classList.remove(
-                    "connected",
-                    "disconnected"
-                );
-
-
-                element.classList.add(
-                    mqttConnected
-                        ? "connected"
-                        : "disconnected"
-                );
-
-            }
+        const mqttElements = document.querySelectorAll(
+            "[data-mqtt-status], #mqttBadge"
         );
 
+        mqttElements.forEach(element => {
+            element.textContent =
+                mqttConnected
+                    ? "Connected"
+                    : "Disconnected";
+
+            element.classList.remove(
+                "connected",
+                "disconnected",
+                "online",
+                "offline"
+            );
+
+            element.classList.add(
+                mqttConnected
+                    ? "connected"
+                    : "disconnected"
+            );
+
+            element.classList.add(
+                mqttConnected
+                    ? "online"
+                    : "offline"
+            );
+        });
 
         /*
          * ESP32 status
@@ -766,37 +590,35 @@ const HomeIoT = {
         const esp32Online =
             this.state.esp32.online === true;
 
-
-        const espElements =
-            document.querySelectorAll(
-                "[data-esp32-status]"
-            );
-
-
-        espElements.forEach(
-            element => {
-
-                element.textContent =
-                    esp32Online
-                        ? "Online"
-                        : "Offline";
-
-
-                element.classList.remove(
-                    "online",
-                    "offline"
-                );
-
-
-                element.classList.add(
-                    esp32Online
-                        ? "online"
-                        : "offline"
-                );
-
-            }
+        const espElements = document.querySelectorAll(
+            "[data-esp32-status]"
         );
 
+        espElements.forEach(element => {
+            element.textContent =
+                esp32Online
+                    ? "Online"
+                    : "Offline";
+
+            element.classList.remove(
+                "connected",
+                "disconnected",
+                "online",
+                "offline"
+            );
+
+            element.classList.add(
+                esp32Online
+                    ? "connected"
+                    : "disconnected"
+            );
+
+            element.classList.add(
+                esp32Online
+                    ? "online"
+                    : "offline"
+            );
+        });
 
         /*
          * Last Seen
@@ -805,24 +627,15 @@ const HomeIoT = {
         const lastSeen =
             this.state.esp32.last_seen;
 
-
-        const lastSeenElements =
-            document.querySelectorAll(
-                "[data-esp32-last-seen]"
-            );
-
-
-        lastSeenElements.forEach(
-            element => {
-
-                element.textContent =
-                    lastSeen || "Never";
-
-            }
+        const lastSeenElements = document.querySelectorAll(
+            "[data-esp32-last-seen]"
         );
 
+        lastSeenElements.forEach(element => {
+            element.textContent =
+                lastSeen || "Never";
+        });
     },
-
 
     /*
      * --------------------------------------------------------
@@ -834,71 +647,38 @@ const HomeIoT = {
         message,
         type = "success"
     ) {
-
-        let container =
-            this.getElement(
-                "commandMessage"
-            );
-
+        let container = this.getElement(
+            "commandMessage"
+        );
 
         if (!container) {
+            container = document.createElement("div");
 
-            container =
-                document.createElement("div");
+            container.id = "commandMessage";
+            container.className = "command-message";
 
-            container.id =
-                "commandMessage";
-
-            container.className =
-                "command-message";
-
-
-            document.body.appendChild(
-                container
-            );
-
+            document.body.appendChild(container);
         }
 
-
-        container.textContent =
-            message;
-
+        container.textContent = message;
 
         container.classList.remove(
             "success",
             "error"
         );
 
+        container.classList.add(type);
+        container.classList.add("visible");
 
-        container.classList.add(
-            type
+        clearTimeout(this.commandMessageTimer);
+
+        this.commandMessageTimer = setTimeout(
+            () => {
+                container.classList.remove("visible");
+            },
+            3500
         );
-
-
-        container.classList.add(
-            "visible"
-        );
-
-
-        clearTimeout(
-            this.commandMessageTimer
-        );
-
-
-        this.commandMessageTimer =
-            setTimeout(
-                () => {
-
-                    container.classList.remove(
-                        "visible"
-                    );
-
-                },
-                3500
-            );
-
     },
-
 
     /*
      * --------------------------------------------------------
@@ -907,29 +687,22 @@ const HomeIoT = {
      */
 
     startPolling() {
-
         /*
          * Initial request.
          */
 
         this.getStatus();
 
-
         /*
          * Refresh every 5 seconds.
-         *
-         * This is only for displaying current state.
          * Appliance automation is NOT performed here.
          */
 
-        this.pollingTimer =
-            setInterval(
-                () => this.getStatus(),
-                5000
-            );
-
+        this.pollingTimer = setInterval(
+            () => this.getStatus(),
+            5000
+        );
     },
-
 
     /*
      * --------------------------------------------------------
@@ -938,7 +711,6 @@ const HomeIoT = {
      */
 
     init() {
-
         /*
          * Make sidebar available globally through the
          * existing onclick="toggleSidebar()" calls.
@@ -947,7 +719,6 @@ const HomeIoT = {
         window.toggleSidebar =
             () => this.toggleSidebar();
 
-
         /*
          * Make device toggle available to the Devices page.
          */
@@ -955,35 +726,26 @@ const HomeIoT = {
         window.toggleDevice =
             device => this.toggleDevice(device);
 
-
         /*
          * Close mobile sidebar after navigation.
          */
 
         document
             .querySelectorAll(".sidebar a")
-            .forEach(
-                link => {
-
-                    link.addEventListener(
-                        "click",
-                        () => this.closeSidebarOnNavigation()
-                    );
-
-                }
-            );
-
+            .forEach(link => {
+                link.addEventListener(
+                    "click",
+                    () => this.closeSidebarOnNavigation()
+                );
+            });
 
         /*
          * Start status updates.
          */
 
         this.startPolling();
-
     }
-
 };
-
 
 /*
  * ============================================================
