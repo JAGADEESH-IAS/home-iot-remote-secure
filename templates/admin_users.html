@@ -13,8 +13,48 @@
 
     <link
         rel="stylesheet"
-        href="{{ url_for('static', filename='style.css') }}?v=35"
+        href="{{ url_for('static', filename='style.css') }}?v=36"
     >
+    <style>
+        /* Admin summary: three equal cards on one row on desktop. */
+        .status-summary {
+            display: grid !important;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 18px;
+            align-items: stretch;
+            width: 100%;
+        }
+        .status-summary .status-summary-item {
+            box-sizing: border-box;
+            width: 100%;
+            min-width: 0;
+            min-height: 112px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        @media (max-width: 640px) {
+            .status-summary {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 8px;
+            }
+            .status-summary .status-summary-item {
+                min-height: 92px;
+                padding: 12px 8px;
+            }
+            .status-summary .status-label {
+                font-size: 12px;
+            }
+            .status-summary .status-summary-item strong {
+                font-size: 24px;
+            }
+        }
+        @media (max-width: 360px) {
+            .status-summary { gap: 5px; }
+            .status-summary .status-summary-item { padding: 10px 5px; }
+            .status-summary .status-label { font-size: 11px; }
+        }
+    </style>
 </head>
 
 <body>
