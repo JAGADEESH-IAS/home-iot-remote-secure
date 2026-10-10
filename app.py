@@ -516,16 +516,25 @@ def on_connect(
 ):
     """
     Called when the persistent MQTT listener connects.
+
+    Paho MQTT Callback API v2 passes a ReasonCode object.
+    In that API, int(reason_code) may raise TypeError even
+    when the broker accepted the connection.
     """
 
     global mqtt_connected
 
-    try:
-        mqtt_connected = (
-            int(reason_code) == 0
-        )
-    except Exception:
-        mqtt_connected = False
+    # Prefer Paho's explicit failure flag when available.
+    is_failure = getattr(reason_code, "is_failure", None)
+
+    if is_failure is not None:
+        mqtt_connected = not bool(is_failure)
+    else:
+        # Compatibility fallback for integer and string reason codes.
+        try:
+            mqtt_connected = int(reason_code) == 0
+        except (TypeError, ValueError):
+            mqtt_connected = str(reason_code).strip().lower() == "success"
 
     print(
         "MQTT CONNECT:",
@@ -537,14 +546,18 @@ def on_connect(
 
     if mqtt_connected:
         try:
-            client.subscribe(
+            result, mid = client.subscribe(
                 MQTT_STATUS_TOPIC,
                 qos=0
             )
 
             print(
-                "MQTT SUBSCRIBED:",
+                "MQTT SUBSCRIBE REQUEST:",
                 MQTT_STATUS_TOPIC,
+                "result:",
+                result,
+                "mid:",
+                mid,
                 flush=True
             )
 
@@ -554,7 +567,12 @@ def on_connect(
                 repr(exc),
                 flush=True
             )
-
+    else:
+        print(
+            "MQTT CONNECTION REJECTED:",
+            repr(reason_code),
+            flush=True
+        )
 
 def on_disconnect(
     client,
