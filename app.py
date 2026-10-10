@@ -1573,7 +1573,10 @@ def api_status():
             ),
 
             "mqtt": {
-                "connected": mqtt_connected
+                "connected": (
+                    mqtt_client is not None
+                    and mqtt_client.is_connected()
+                )
             },
 
             "esp32": {
