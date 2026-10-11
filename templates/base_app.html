@@ -1,0 +1,97 @@
+{#- ============================================================
+    Authenticated application shell.
+    Desktop: sticky top navigation. Mobile: slide-in drawer.
+    Hooks preserved from the original pages:
+      #sidebar, .sidebar a, onclick="toggleSidebar()"
+    Child blocks: title, eyebrow, heading, subtitle, topbar_extra,
+                  content, scripts
+    ============================================================ -#}
+{% from "_icons.html" import icon %}
+{% from "_brand.html" import brand %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#F2EEE6">
+    <title>{% block title %}{% endblock %} | HomeIoT</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
+    <link rel="preload" href="{{ url_for('static', filename='fonts/HomeIoTSerif.woff') }}" as="font" type="font/woff" crossorigin>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=60">
+</head>
+<body class="app-body">
+
+<a class="skip-link" href="#main">Skip to content</a>
+
+<div class="app-shell">
+
+    {% include "_sidebar.html" %}
+
+    <div class="sidebar-scrim" onclick="toggleSidebar()" aria-hidden="true"></div>
+
+    <div class="mobile-bar">
+        <button
+            type="button"
+            class="mobile-menu"
+            onclick="toggleSidebar()"
+            aria-label="Open menu"
+            aria-controls="sidebar"
+        >
+            {{ icon("menu", 22) }}
+        </button>
+        <a class="mobile-brand" href="{{ url_for('home') }}" aria-label="HomeIoT home">{{ brand(False) }}</a>
+    </div>
+
+    <main class="main" id="main">
+
+        <header class="page-head">
+
+            <div class="page-head-title">
+                <p class="eyebrow">{% block eyebrow %}{% endblock %}</p>
+                <h1>{% block heading %}{% endblock %}</h1>
+                {% block subtitle_wrap %}
+                <p class="subtitle">{% block subtitle %}{% endblock %}</p>
+                {% endblock %}
+            </div>
+
+            <div class="page-head-extra">
+                {% block topbar_extra %}{% endblock %}
+            </div>
+
+        </header>
+
+        <div class="page-content">
+            {% block content %}{% endblock %}
+        </div>
+
+        <footer class="app-footer">
+            <span>HomeIoT Remote Control</span>
+            <span>Flask · HiveMQ · ESP32</span>
+        </footer>
+
+    </main>
+
+</div>
+
+{#- Fallback so the menu button also works on pages that do not load
+    static/app.js (History, Settings, Admin). When app.js is loaded it
+    redefines window.toggleSidebar with its own implementation.
+    Also lets Escape close the open drawer. -#}
+<script>
+    if (typeof window.toggleSidebar !== "function") {
+        window.toggleSidebar = function () {
+            var sidebar = document.getElementById("sidebar");
+            if (sidebar) { sidebar.classList.toggle("open"); }
+        };
+    }
+    document.addEventListener("keydown", function (event) {
+        if (event.key !== "Escape") { return; }
+        var sidebar = document.getElementById("sidebar");
+        if (sidebar && sidebar.classList.contains("open")) { sidebar.classList.remove("open"); }
+    });
+</script>
+
+{% block scripts %}{% endblock %}
+
+</body>
+</html>

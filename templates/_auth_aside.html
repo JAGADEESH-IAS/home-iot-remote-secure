@@ -1,0 +1,12 @@
+{#- Brand panel shown beside every auth form (desktop) / as a header (mobile). -#}
+{% from "_brand.html" import brand %}
+<aside class="auth-aside">
+    <a class="auth-aside-brand" href="{{ url_for('home') }}" aria-label="HomeIoT home">{{ brand() }}</a>
+
+    <div class="auth-aside-body">
+        <p class="auth-aside-quote">Your home, <em>answering</em> from anywhere.</p>
+        <div class="auth-aside-art" aria-hidden="true">{% include "_house_art.html" %}</div>
+    </div>
+
+    <p class="auth-aside-foot">Illustration only. Appliance states are shown after you sign in.</p>
+</aside>

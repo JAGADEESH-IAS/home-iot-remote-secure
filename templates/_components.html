@@ -1,0 +1,19 @@
+{#- Small shared UI macros. All JS-driven hooks (data-* attributes and
+    ids) are identical to the original templates. -#}
+{% from "_icons.html" import icon %}
+
+{#- MQTT status-feed pill. app.js rewrites its text to Connected /
+    Disconnected and toggles connected/disconnected/online/offline. -#}
+{% macro mqtt_chip(connected) -%}
+<span class="status-chip {{ 'online connected' if connected else 'offline disconnected' }}" data-mqtt-status>{{ 'Connected' if connected else 'Disconnected' }}</span>
+{%- endmacro %}
+
+{#- ESP32 pill (dashboard). app.js rewrites to Online / Offline. -#}
+{% macro esp_chip(online) -%}
+<span class="status-chip {{ 'online connected' if online else 'offline disconnected' }}" data-esp32-status>{{ 'Online' if online else 'Offline' }}</span>
+{%- endmacro %}
+
+{#- Appliance state pill. app.js rewrites to ON / OFF and toggles on/off. -#}
+{% macro state_pill(device, state) -%}
+<span class="state-pill {{ 'on' if state == 'ON' else 'off' }}" data-device-status="{{ device }}">{{ 'ON' if state == 'ON' else 'OFF' }}</span>
+{%- endmacro %}

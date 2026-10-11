@@ -1,0 +1,142 @@
+{% extends "base_app.html" %}
+{% from "_icons.html" import icon %}
+{% from "_components.html" import mqtt_chip, esp_chip, state_pill %}
+
+{% block title %}Dashboard{% endblock %}
+{% block eyebrow %}Overview{% endblock %}
+{% block heading %}Dashboard{% endblock %}
+{% block subtitle %}The latest state reported by your ESP32. This page is view-only.{% endblock %}
+
+{% block topbar_extra %}
+<span class="view-only-badge">{{ icon("eye", 16) }} View only</span>
+{% endblock %}
+
+{% block content %}
+
+<!-- CONNECTIVITY: three separate facts, never merged -->
+<section class="status-bar" aria-label="System connectivity">
+
+    <div class="status-bar-item">
+        <span class="status-label">ESP32</span>
+        <span class="status-value">{{ esp_chip(esp32.online) }}</span>
+        <span class="status-hint">Online while recent status messages arrive.</span>
+    </div>
+
+    <div class="status-bar-item">
+        <span class="status-label">Last seen</span>
+        <span class="status-value mono" data-esp32-last-seen>{{ esp32.last_seen }}</span>
+        <span class="status-hint">Latest ESP32 status message (IST).</span>
+    </div>
+
+    <div class="status-bar-item">
+        <span class="status-label">MQTT status feed</span>
+        <span class="status-value">{{ mqtt_chip(mqtt_connected) }}</span>
+        <span class="status-hint">Status messages received via HiveMQ.</span>
+    </div>
+
+</section>
+
+<p class="stale-note" role="status">
+    {{ icon("alert", 18) }}
+    <span>The ESP32 is not reporting. Everything below is the last state it reported, not live.</span>
+</p>
+
+<div class="dash-grid">
+
+    <!-- APPLIANCES -->
+    <section class="dash-appliances" aria-labelledby="appliancesHeading">
+
+        <div class="section-heading">
+            <div>
+                <span class="section-eyebrow">Appliances</span>
+                <h2 id="appliancesHeading">Right now</h2>
+            </div>
+        </div>
+
+        <ul class="appliance-list">
+            <li class="appliance-item">
+                <span class="appliance-icon">{{ icon("light", 24) }}</span>
+                <span class="appliance-name"><strong>Light</strong><small>Living area</small></span>
+                {{ state_pill("light", status.devices.light) }}
+            </li>
+            <li class="appliance-item">
+                <span class="appliance-icon">{{ icon("fan", 24) }}</span>
+                <span class="appliance-name"><strong>Fan</strong><small>Living area</small></span>
+                {{ state_pill("fan", status.devices.fan) }}
+            </li>
+            <li class="appliance-item">
+                <span class="appliance-icon">{{ icon("geyser", 24) }}</span>
+                <span class="appliance-name"><strong>Geyser</strong><small>Bathroom</small></span>
+                {{ state_pill("geyser", status.devices.geyser) }}
+            </li>
+        </ul>
+
+        <a class="text-link" href="{{ url_for('devices') }}">
+            Control appliances on the Devices page {{ icon("arrow-right", 16) }}
+        </a>
+
+    </section>
+
+    <!-- SENSORS -->
+    <section class="dash-sensors" aria-labelledby="sensorsHeading">
+
+        <div class="section-heading">
+            <div>
+                <span class="section-eyebrow">ESP32 sensors</span>
+                <h2 id="sensorsHeading">Readings</h2>
+            </div>
+        </div>
+
+        <div class="sensor-grid">
+
+            <article class="sensor-card">
+                <span class="sensor-label">{{ icon("thermometer", 18) }} Temperature</span>
+                <strong class="sensor-value" id="temperature">
+                    {% if status.sensors.temperature is not none %}
+                        {{ status.sensors.temperature }} °C
+                    {% else %}
+                        --
+                    {% endif %}
+                </strong>
+            </article>
+
+            <article class="sensor-card">
+                <span class="sensor-label">{{ icon("droplet", 18) }} Humidity</span>
+                <strong class="sensor-value" id="humidity">
+                    {% if status.sensors.humidity is not none %}
+                        {{ status.sensors.humidity }} %
+                    {% else %}
+                        --
+                    {% endif %}
+                </strong>
+            </article>
+
+            <article class="sensor-card">
+                <span class="sensor-label">{{ icon("gas", 18) }} Gas status</span>
+                <strong class="sensor-value is-text" id="gas">{{ status.sensors.gas or "UNKNOWN" }}</strong>
+            </article>
+
+            <article class="sensor-card">
+                <span class="sensor-label">{{ icon("gauge", 18) }} Gas sensor raw</span>
+                <strong class="sensor-value" id="gasRaw">
+                    {% if status.sensors.gas_raw is not none %}
+                        {{ status.sensors.gas_raw }}
+                    {% else %}
+                        --
+                    {% endif %}
+                </strong>
+            </article>
+
+        </div>
+
+        <p class="fine-print">Readings update from ESP32 status messages. Trends are not shown because only the latest values are stored.</p>
+
+    </section>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}
