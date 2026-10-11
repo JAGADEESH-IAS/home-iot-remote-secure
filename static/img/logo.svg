@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 190 40" role="img" aria-label="HomeIoT">
+  <g fill="none" stroke="#1D1B17" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 21 20 5l17 16"/><path d="M9 19v16h22V19"/>
+  </g>
+  <circle cx="20" cy="27" r="3.6" fill="#C2410C"/>
+  <text x="48" y="29" font-family="Lora, Georgia, serif" font-size="25" font-weight="600" fill="#1D1B17" letter-spacing="-0.3">HomeIoT</text>
+</svg>

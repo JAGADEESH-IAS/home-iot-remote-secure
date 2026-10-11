@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="HomeIoT">
+  <rect width="64" height="64" rx="14" fill="#1D1B17"/>
+  <path d="M12 33 32 15l20 18" fill="none" stroke="#F2EEE6" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M19 31v17h26V31" fill="none" stroke="#F2EEE6" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="32" cy="40" r="4.2" fill="#E8590C"/>
+</svg>
