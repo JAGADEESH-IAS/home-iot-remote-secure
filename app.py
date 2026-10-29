@@ -77,7 +77,7 @@ db = firestore.client()
 
 MQTT_BROKER = os.environ.get(
     "MQTT_BROKER",
-    "bravetawny-af88996b.a02.usw2.aws.hivemq.cloud"
+    "broker.freemqtt.com"
 ).strip()
 
 MQTT_PORT = int(
@@ -95,12 +95,12 @@ MQTT_PASSWORD = os.environ.get(
 ).strip()
 
 
-MQTT_STATUS_TOPIC = "home/status"
+MQTT_STATUS_TOPIC = "homeiot-jd27-demo-6f3a/status"
 
 DEVICE_TOPICS = {
-    "light": "home/light",
-    "fan": "home/fan",
-    "geyser": "home/geyser",
+    "light": "homeiot-jd27-demo-6f3a/light",
+    "fan": "homeiot-jd27-demo-6f3a/fan",
+    "geyser": "homeiot-jd27-demo-6f3a/geyser",
 }
 
 
@@ -789,7 +789,7 @@ def publish_device_command(
 
     Important:
     - QoS remains 0.
-    - retain remains True.
+    - Commands are not retained on the broker.
     - The command client is separate from the persistent
       status-listener client.
     """
@@ -849,7 +849,7 @@ def publish_device_command(
 
         print(
             "Retain:",
-            True,
+            False,
             flush=True
         )
 
@@ -877,7 +877,7 @@ def publish_device_command(
             topic,
             payload=action,
             qos=0,
-            retain=True,
+            retain=False,
         )
 
         print(
